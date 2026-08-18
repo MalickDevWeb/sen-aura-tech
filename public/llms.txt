@@ -1,0 +1,57 @@
+# SEN AURA TECH (https://www.senauratech.com)
+> La plateforme technologique de référence au Sénégal pour la formation en développement web, l'intelligence artificielle (IA), la création de sites web professionnels, la conception d'applications mobiles et les infrastructures IT.
+
+## À propos de SEN AURA TECH
+- **Nom officiel** : SEN AURA TECH (SEN-AURA-TECH)
+- **Fondateur & Direction Technique** : Malick Teuw
+- **Localisation** : Dakar, Sénégal (Plateau / Almadies)
+- **Contact & Support** : +221 70 533 46 11 | malickteuw.devweb@gmail.com
+- **Site Web Officiel** : https://www.senauratech.com/
+- **Communauté WhatsApp Officielle** : https://chat.whatsapp.com/FX3lEsEqU0CLD4xesnsDg9?s=sh&p=a&ilr=4
+
+---
+
+## 🚀 Programme Phare : « Une Semaine, Une Application, Une Solution »
+SEN AURA TECH développe et livre chaque semaine en 7 jours chrono une solution logicielle et IA opérationnelle répondant à un besoin économique ou social concret en Afrique :
+- **Semaine #1** : *SEN-PHARMA* - Localisation des pharmacies de garde et urgences médicales à Dakar.
+- **Semaine #2** : *SEN-QUICK PAY* - Micro-boutique WhatsApp & encaissement automatique par Wave QR.
+- **Semaine #3** : *SEN-ARTISAN PRO* - Plateforme de dispatching d'artisans certifiés (plombiers, électriciens).
+- **Semaine #4** : *SEN-AURA AI CO-PILOT* - Assistant juridique & fiscal OHADA alimenté par l'IA Gemini.
+- **Semaine #5** : *SEN-AGRI CLIMAT* - Météo prédictive & cours des marchés agricoles en Wolof et Français.
+- **Semaine #6** : *SEN-CAMPUS CODE* - Entraînement interactif aux tests techniques pour développeurs.
+
+---
+
+## 🎓 SEN AURA ACADEMY - Formations Certifiantes
+- **Développement Web & Fullstack** : HTML5, CSS3, Tailwind CSS, TypeScript, React, Next.js, Node.js, PostgreSQL.
+- **Intelligence Artificielle & Automatisation** : IA Générative, API Gemini, Conception d'Agents IA Autonomes, Prompt Engineering, RAG & LLMs.
+- **Conception d'Applications Mobiles** : Flutter, React Native, intégration des API Mobile Money (Wave, Orange Money).
+- **Cybersécurité & DevOps** : Sécurisation de serveurs Linux, Docker, CI/CD, audit de vulnérabilités.
+- **Vidéosurveillance IP & Réseaux** : Installation caméras IP Dahua/Hikvision, câblage RJ45, switchs et routeurs Cisco.
+
+---
+
+## 🛠️ Pôles d'Excellence & Services Informatiques
+1. **Pôle Solutions Numériques & IA** :
+   - Création de sites internet vitrines et e-commerce sur-mesure.
+   - Développement d'applications mobiles Android et iOS avec paiement Wave / Orange Money.
+   - Intégration de chatbots intelligents et agents IA pour le service client.
+   - Logiciels ERP et gestion commerciale pour PME sénégalaises.
+2. **Pôle Infrastructures & Services Techniques** :
+   - Installation de systèmes de vidéosurveillance haute définition IP.
+   - Câblage réseau, fibre optique et baies de brassage.
+   - Systèmes d'énergie solaire hybride avec batteries lithium et onduleurs.
+3. **Pôle Conseil, Audit & Ingénierie SI** :
+   - Schémas directeurs informatiques et conformité RGPD / CDP Sénégal.
+4. **Marketplace & Recrutement Tech** :
+   - Mise en relation avec des développeurs, techniciens et artisans vérifiés.
+   - Dépôt de CV et recrutement prioritaire pour entreprises partenaires.
+
+---
+
+## 🔗 Liens et Documentation
+- [Site Officiel](https://www.senauratech.com/)
+- [Programme 1 Semaine 1 Solution](https://www.senauratech.com/?tab=une-semaine-une-solution)
+- [Catalogue Academy & Formations](https://www.senauratech.com/?tab=academy)
+- [Solutions Numériques & Devis](https://www.senauratech.com/?tab=solutions-numeriques)
+- [Documentation Complète LLMs](https://www.senauratech.com/llms-full.txt)

@@ -1,0 +1,147 @@
+{
+  "entities": {
+    "user_security_accounts": {
+      "title": "Comptes de Sécurité PIN Utilisateurs",
+      "description": "Comptes sécurisés par code PIN secret et numéro de téléphone unique",
+      "fields": {
+        "cleanPhone": { "type": "string", "description": "Numéro de téléphone nettoyé sans indicatif (clé unique)" },
+        "phone": { "type": "string", "description": "Numéro de téléphone formaté +221" },
+        "email": { "type": "string", "description": "Adresse email de l'utilisateur" },
+        "fullName": { "type": "string", "description": "Nom complet de l'utilisateur" },
+        "pinHash": { "type": "string", "description": "Empreinte cryptographique SHA-256 du code PIN" },
+        "role": { "type": "string", "description": "Rôle : CLIENT, PROFESSIONAL, FORMATEUR, VENDEUR, ADMIN" },
+        "region": { "type": "string", "description": "Région de résidence" },
+        "failedAttempts": { "type": "number", "description": "Compteur de tentatives infructueuses" },
+        "lockedUntil": { "type": "number", "description": "Timestamp de déverrouillage" },
+        "createdAt": { "type": "string", "description": "Date de création ISO" },
+        "lastLoginAt": { "type": "string", "description": "Date de dernière connexion ISO" }
+      }
+    },
+    "users": {
+      "title": "Profils Utilisateurs Firebase",
+      "description": "Profils généraux des utilisateurs avec email et numéro de téléphone uniques",
+      "fields": {
+        "uid": { "type": "string", "description": "Identifiant unique Firebase UID" },
+        "email": { "type": "string", "description": "Email unique de l'utilisateur" },
+        "phone": { "type": "string", "description": "Numéro de téléphone unique de l'utilisateur" },
+        "displayName": { "type": "string", "description": "Nom complet affiché" },
+        "role": { "type": "string", "description": "Rôle de l'utilisateur" },
+        "region": { "type": "string", "description": "Région" },
+        "createdAt": { "type": "string", "description": "Date de création ISO" }
+      }
+    },
+    "quotes": {
+      "title": "Demandes de Devis",
+      "description": "Devis solaires, reseaux, securite et solutions numeriques",
+      "fields": {
+        "id": { "type": "string", "description": "Reference du devis SAT-DEV-XXX" },
+        "userId": { "type": "string", "description": "ID de l'utilisateur" },
+        "userName": { "type": "string", "description": "Nom du client" },
+        "userPhone": { "type": "string", "description": "Numero de telephone" },
+        "pole": { "type": "string", "description": "Pole concerne" },
+        "serviceTitle": { "type": "string", "description": "Titre du service" },
+        "description": { "type": "string", "description": "Description du besoin" },
+        "region": { "type": "string", "description": "Region au Senegal" },
+        "budgetFCFA": { "type": "number", "description": "Budget estime en FCFA" },
+        "status": { "type": "string", "description": "Statut de la demande" },
+        "createdAt": { "type": "string", "description": "Date de creation ISO" }
+      }
+    },
+    "bookings": {
+      "title": "Reservations de Techniciens Pro",
+      "description": "Missions et interventions terrain des prestataires",
+      "fields": {
+        "id": { "type": "string", "description": "Reference SAT-RES-XXX" },
+        "clientId": { "type": "string", "description": "ID du client" },
+        "clientName": { "type": "string", "description": "Nom du client" },
+        "clientPhone": { "type": "string", "description": "Telephone du client" },
+        "proId": { "type": "string", "description": "ID du technicien pro" },
+        "proName": { "type": "string", "description": "Nom du technicien" },
+        "proCategory": { "type": "string", "description": "Specialite" },
+        "date": { "type": "string", "description": "Date de la mission" },
+        "time": { "type": "string", "description": "Heure de la mission" },
+        "region": { "type": "string", "description": "Region" },
+        "address": { "type": "string", "description": "Adresse exacte" },
+        "description": { "type": "string", "description": "Details des travaux" },
+        "estimatedFCFA": { "type": "number", "description": "Montant estime" },
+        "status": { "type": "string", "description": "Statut de la reservation" },
+        "createdAt": { "type": "string", "description": "Date ISO" }
+      }
+    },
+    "orders": {
+      "title": "Commandes d'Equipements",
+      "description": "Achats e-commerce d'equipements solaires et reseaux",
+      "fields": {
+        "id": { "type": "string", "description": "Reference TX-SAT-XXX" },
+        "userId": { "type": "string", "description": "ID client" },
+        "userName": { "type": "string", "description": "Nom client" },
+        "totalFCFA": { "type": "number", "description": "Montant total en FCFA" },
+        "paymentMethod": { "type": "string", "description": "wave, orange_money, cb" },
+        "paymentStatus": { "type": "string", "description": "SUCCES, EN_ATTENTE" },
+        "shippingAddress": { "type": "string", "description": "Adresse de livraison" },
+        "region": { "type": "string", "description": "Region de livraison" },
+        "createdAt": { "type": "string", "description": "Date ISO" }
+      }
+    },
+    "tickets": {
+      "title": "Tickets Support Client",
+      "description": "Reclamations et assistance technique",
+      "fields": {
+        "id": { "type": "string", "description": "Reference TK-XXX" },
+        "userId": { "type": "string", "description": "ID de l'utilisateur" },
+        "userName": { "type": "string", "description": "Nom du demandeur" },
+        "subject": { "type": "string", "description": "Sujet de l'assistance" },
+        "pole": { "type": "string", "description": "Service concerne" },
+        "priority": { "type": "string", "description": "Priorite" },
+        "status": { "type": "string", "description": "Statut" },
+        "createdAt": { "type": "string", "description": "Date ISO" }
+      }
+    },
+    "partner_applications": {
+      "title": "Candidatures Partenaires",
+      "description": "Inscriptions des apporteurs d'affaires et ambassadeurs",
+      "fields": {
+        "fullName": { "type": "string", "description": "Nom complet" },
+        "email": { "type": "string", "description": "Email" },
+        "phone": { "type": "string", "description": "Telephone" },
+        "profileType": { "type": "string", "description": "Type de profil partenaire" },
+        "city": { "type": "string", "description": "Ville/Region" },
+        "notes": { "type": "string", "description": "Notes et motivations" },
+        "createdAt": { "type": "string", "description": "Date ISO" }
+      }
+    },
+    "certificates": {
+      "title": "Certificats et Diplômes Homologués",
+      "description": "Certificats de formation avec numéro unique et vérification QR",
+      "fields": {
+        "certificateNumber": { "type": "string", "description": "Numéro unique de certificat" },
+        "studentName": { "type": "string", "description": "Nom de l'étudiant certifié" },
+        "studentEmail": { "type": "string", "description": "Email de l'étudiant" },
+        "studentPhone": { "type": "string", "description": "Téléphone de l'étudiant" },
+        "courseTitle": { "type": "string", "description": "Titre du parcours de formation" },
+        "scoreOrMention": { "type": "string", "description": "Score ou Mention d'excellence" },
+        "badgeTitle": { "type": "string", "description": "Titre du badge homologué" },
+        "instructorName": { "type": "string", "description": "Nom de l'instructeur" },
+        "hoursCount": { "type": "number", "description": "Volume d'heures de formation" },
+        "issueDate": { "type": "string", "description": "Date de délivrance" },
+        "qrVerificationCode": { "type": "string", "description": "Code unique de vérification QR" },
+        "status": { "type": "string", "description": "Statut (ex: OFFICIEL)" }
+      }
+    },
+    "invoices": {
+      "title": "Factures Officielles Client",
+      "description": "Factures et reçus numérotés avec traçabilité comptable",
+      "fields": {
+        "invoiceNumber": { "type": "string", "description": "Numéro unique de facture" },
+        "orderId": { "type": "string", "description": "Référence de commande associée" },
+        "clientName": { "type": "string", "description": "Nom ou raison sociale du client" },
+        "clientPhone": { "type": "string", "description": "Téléphone du client" },
+        "clientEmail": { "type": "string", "description": "Email du client" },
+        "amountFCFA": { "type": "number", "description": "Montant total en FCFA" },
+        "status": { "type": "string", "description": "Statut de paiement (ex: PAYEE)" },
+        "paymentMethod": { "type": "string", "description": "Méthode de paiement" },
+        "createdAt": { "type": "string", "description": "Date d'émission" }
+      }
+    }
+  }
+}

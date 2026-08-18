@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 1. User Security Accounts (PIN Auth & Key by cleanPhone)
+    match /user_security_accounts/{phoneId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if true;
+    }
+
+    // 2. Users Profiles
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 3. Quotes (Devis & Projets)
+    match /quotes/{quoteId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // 4. Bookings (Réservations Techniciens Pro)
+    match /bookings/{bookingId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // 5. Orders (Commandes Boutique & Équipements)
+    match /orders/{orderId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // 6. Tickets (Support & Réclamations)
+    match /tickets/{ticketId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // 7. Partner Applications (Candidatures Ambassadeurs & Partenaires)
+    match /partner_applications/{applicationId} {
+      allow read, create: if true;
+      allow update, delete: if true;
+    }
+
+    // Default fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

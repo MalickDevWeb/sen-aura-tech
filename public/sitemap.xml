@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
+        http://www.google.com/schemas/sitemap-image/1.1
+        http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
+
+  <!-- ========================================== -->
+  <!-- 1. PAGES PRINCIPALES & PÔLES STRATÉGIQUES -->
+  <!-- ========================================== -->
+
+  <!-- Page d'accueil officielle SEN AURA TECH -->
+  <url>
+    <loc>https://www.senauratech.com/</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>always</changefreq>
+    <priority>1.00</priority>
+    <image:image>
+      <image:loc>https://www.senauratech.com/og-preview.jpg</image:loc>
+      <image:title>SEN AURA TECH - Plateforme Technologique et Écosystème Numérique au Sénégal</image:title>
+      <image:caption>Solutions Numériques, Infrastructures IT, Conseil &amp; Ingénierie, Academy et Marketplace</image:caption>
+    </image:image>
+  </url>
+
+  <!-- Programme Flagship : 1 Semaine, 1 Application, 1 Solution -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=une-semaine-une-solution</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.98</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Programme d'Innovation Accélérée : 1 Semaine = 1 Application = 1 Solution au Sénégal</image:title>
+      <image:caption>Chaque semaine, une nouvelle application logicielle et IA livrée pour résoudre un problème économique concret au Sénégal.</image:caption>
+    </image:image>
+  </url>
+
+  <!-- Pôle 1 : Solutions Numériques & IA -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=solutions-numeriques</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Pôle Solutions Numériques &amp; IA - SEN AURA TECH</image:title>
+      <image:caption>Développement Web, Applications Mobiles, Automatisation IA et Logiciels Métiers au Sénégal</image:caption>
+    </image:image>
+  </url>
+
+  <!-- Pôle 2 : Infrastructures & Services Techniques -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=infrastructures-techniques</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Pôle Infrastructures Techniques &amp; Sécurité - SEN AURA TECH</image:title>
+      <image:caption>Vidéosurveillance IP, Réseaux Fibre Optique, Énergie Solaire et Câblage Informatique</image:caption>
+    </image:image>
+  </url>
+
+  <!-- Pôle 3 : Conseil, Ingénierie & Audit SI -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=conseil-ingenierie</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <!-- Pôle 4 : SEN AURA Academy (Formations & Certifications Tech) -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=academy</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1677442136019-21780efad99a?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>SEN AURA Academy - Formations Certifiantes au Sénégal</image:title>
+      <image:caption>Formations en Développement Web, IA Générative Gemini, Cybersécurité et Vidéosurveillance</image:caption>
+    </image:image>
+  </url>
+
+  <!-- Marketplace des Professionnels & Artisans Certifiés -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=marketplace</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>always</changefreq>
+    <priority>0.95</priority>
+  </url>
+
+  <!-- Boutique Officielle de Matériels & Licences -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=shop</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>always</changefreq>
+    <priority>0.95</priority>
+  </url>
+
+  <!-- Écosystème Partenaires & Apporteurs d'Affaires -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=partners</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <!-- ========================================== -->
+  <!-- 2. SERVICES & EXPERTISES CLÉS DÉTAILLÉES  -->
+  <!-- ========================================== -->
+
+  <!-- Développement Web & Cloud SaaS -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=solutions-numeriques&amp;service=web-cloud</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Applications Mobiles Flutter & React Native avec Paiement Wave -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=solutions-numeriques&amp;service=mobile-apps</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Intelligence Artificielle, Agents Gemini & Automatisation ERP -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=solutions-numeriques&amp;service=ai-automation</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <!-- Cybersécurité, DevOps & Audit Sécurité SI -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=solutions-numeriques&amp;service=cybersecurity</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Vidéosurveillance IP & Sécurité Électronique Dahua / Hikvision -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=infrastructures-techniques&amp;service=videosurveillance</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Fibre Optique & Réseaux Informatiques Entreprise Cisco -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=infrastructures-techniques&amp;service=reseaux-fibre</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Énergie Solaire & Onduleurs Hybrides Autonomes -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=infrastructures-techniques&amp;service=solaire-energie</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- ========================================== -->
+  <!-- 3. CATÉGORIES BOUTIQUE ÉQUIPEMENTS & TECH  -->
+  <!-- ========================================== -->
+
+  <!-- Boutique : Ordinateurs Portables & PC Pros -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=shop&amp;category=Ordinateurs</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Boutique : Vidéosurveillance & Caméras IP -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=shop&amp;category=Videosurveillance</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Boutique : Énergie Solaire, Onduleurs & Batteries Lithium -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=shop&amp;category=Solaire-Energie</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Boutique : Serveurs, Réseaux & Kits Satellite Starlink -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=shop&amp;category=Serveurs-Reseaux</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Boutique : Logiciels, Windows 11 & Licences Officielles -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=shop&amp;category=Logiciels-Licences</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- ========================================== -->
+  <!-- 4. CATÉGORIES MARKETPLACE PROFESSIONNELS   -->
+  <!-- ========================================== -->
+
+  <!-- Marketplace : Développeurs Logiciels & Web Dakar -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=marketplace&amp;category=Developpement-Software</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- Marketplace : Techniciens Réseau & Fibre Optique -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=marketplace&amp;category=Reseau-Fibre</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- Marketplace : Électriciens Certifiés & Énergie Solaire -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=marketplace&amp;category=Electricite</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- Marketplace : Installateurs Vidéosurveillance & Alarme -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=marketplace&amp;category=Videosurveillance</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- Marketplace : Plomberie & Systèmes de Pompage -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=marketplace&amp;category=Plomberie</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- Marketplace : Experts Juridiques & Droit Numérique OHADA -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=marketplace&amp;category=Juridique</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- ========================================== -->
+  <!-- 5. FORMATIONS CERTIFIANTES (ACADEMY)       -->
+  <!-- ========================================== -->
+
+  <!-- Formation : Développeur Fullstack Next.js -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=academy&amp;course=course-1</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Formation : Masterclass IA Gemini API & Agents IA -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=academy&amp;course=course-2</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <!-- Formation : Vidéosurveillance IP & Alarmes Anti-Intrusion -->
+  <url>
+    <loc>https://www.senauratech.com/?tab=academy&amp;course=course-3</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- ========================================== -->
+  <!-- 6. COMMUNAUTÉ, EMPLOIS & RECRUTEMENT TECH  -->
+  <!-- ========================================== -->
+
+  <!-- Espace Communauté Officielle WhatsApp & Dépôt CV -->
+  <url>
+    <loc>https://www.senauratech.com/?action=rejoindre-communaute</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>always</changefreq>
+    <priority>0.95</priority>
+  </url>
+
+  <!-- Dépôt de CV & Candidature Spontanée Prioritaire -->
+  <url>
+    <loc>https://www.senauratech.com/?action=deposer-cv</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <!-- Demande de Devis Express Instantané -->
+  <url>
+    <loc>https://www.senauratech.com/?action=demande-devis</loc>
+    <lastmod>2026-08-16T12:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+</urlset>

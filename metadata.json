@@ -1,0 +1,6 @@
+{
+  "name": "SEN AURA TECH",
+  "description": "Plateforme Technologique et Écosystème Unifié pour l'Afrique : Solutions Numériques, Infrastructures Techniques, Conseil, Academy, Marketplace des Pros & Boutique.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
