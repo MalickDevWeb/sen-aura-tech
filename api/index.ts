@@ -328,6 +328,15 @@ const schemas = {
 
 const app = express();
 
+app.get("/api/health", (_req, res) => {
+  res.json({
+    success: true,
+    service: "sen-aura-tech-api",
+    databaseConfigured: Boolean(process.env.DATABASE_URL),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Security headers
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -688,7 +697,6 @@ app.post("/api/auth/verify-pin", async (req, res) => {
       return res.status(400).json({ success: false, error: "Téléphone et PIN requis" });
     }
     
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     const user = await neonDbService.getUserByPhone(phone);
 
     if (!user) {
@@ -794,7 +802,6 @@ app.get("/api/db/users", requireAuth, requireAdmin, async (_req, res) => {
 // Products & Boutique
 app.get("/api/db/products", async (_req, res) => {
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     const products = await neonDbService.getAllProducts();
     if (products && products.length > 0) {
       return res.json({ success: true, products });
@@ -813,7 +820,6 @@ app.post("/api/db/products", requireAuth, requireAdmin, async (req, res) => {
       createdAt: req.body.createdAt || new Date().toISOString(),
     };
     inMemoryData.products.unshift(newProduct);
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveProduct(newProduct);
     res.json({ success: true, product: saved || newProduct });
   } catch (err: any) {
@@ -830,7 +836,6 @@ app.put("/api/db/products/:id", requireAuth, requireAdmin, async (req, res) => {
   }
   inMemoryData.products[idx] = { ...inMemoryData.products[idx], ...req.body, updatedAt: new Date().toISOString() };
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     await neonDbService.saveProduct(inMemoryData.products[idx]);
   } catch (err) {}
   res.json({ success: true, product: inMemoryData.products[idx] });
@@ -845,7 +850,6 @@ app.delete("/api/db/products/:id", requireAuth, requireAdmin, async (req, res) =
   inMemoryData.products.splice(idx, 1);
   inMemoryData.vendorProducts = (inMemoryData.vendorProducts || []).filter((p: any) => p.id !== id);
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     await neonDbService.deleteProduct(id);
   } catch (err) {}
   res.json({ success: true, message: "Produit supprimé" });
@@ -854,7 +858,6 @@ app.delete("/api/db/products/:id", requireAuth, requireAdmin, async (req, res) =
 // Courses & Academy
 app.get("/api/db/courses", async (_req, res) => {
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     const courses = await neonDbService.getAllCourses();
     res.json({ success: true, courses });
   } catch (err: any) {
@@ -871,7 +874,6 @@ app.post("/api/db/courses", requireAuth, requireAdmin, async (req, res) => {
       createdAt: req.body.createdAt || new Date().toISOString(),
     };
     inMemoryData.courses.unshift(newCourse);
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveCourse(newCourse);
     res.json({ success: true, course: saved || newCourse });
   } catch (err: any) {
@@ -887,7 +889,6 @@ app.put("/api/db/courses/:id", requireAuth, requireAdmin, async (req, res) => {
   }
   inMemoryData.courses[idx] = { ...inMemoryData.courses[idx], ...req.body, updatedAt: new Date().toISOString() };
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     await neonDbService.saveCourse(inMemoryData.courses[idx]);
   } catch (err) {}
   res.json({ success: true, course: inMemoryData.courses[idx] });
@@ -901,7 +902,6 @@ app.delete("/api/db/courses/:id", requireAuth, requireAdmin, async (req, res) =>
   }
   inMemoryData.courses.splice(idx, 1);
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     await neonDbService.deleteCourse(id);
   } catch (err) {}
   res.json({ success: true, message: "Formation supprimée" });
@@ -910,7 +910,6 @@ app.delete("/api/db/courses/:id", requireAuth, requireAdmin, async (req, res) =>
 // Providers & Pros
 app.get("/api/db/providers", async (_req, res) => {
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     const providers = await neonDbService.getAllProviders();
     res.json({ success: true, providers });
   } catch (err: any) {
@@ -921,7 +920,6 @@ app.get("/api/db/providers", async (_req, res) => {
 
 app.post("/api/db/providers", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveProvider(req.body);
     res.json({ success: true, provider: saved });
   } catch (err: any) {
@@ -935,7 +933,6 @@ app.post("/api/db/providers/sync", requireAuth, async (req, res) => {
     if (!provider) {
       return res.status(400).json({ success: false, error: "Provider data required" });
     }
-    const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveProvider(provider);
     res.json({ success: true, provider: saved });
   } catch (err: any) {
@@ -1864,8 +1861,6 @@ app.post("/api/auth/verify-pin", async (req, res) => {
   const ip = Array.isArray(clientIp) ? clientIp[0] : clientIp.split(',')[0];
 
   try {
-    const { neonDbService } = await import("../src/db/neon-service.ts");
-    
     // Vérification Pare-Feu
     const status = await neonDbService.getSecurityStatus(ip);
     if (status.blocked) {
