@@ -64,13 +64,15 @@ async function verifyPinHandler(req: any, res: any) {
     const sql = neon(DATABASE_URL);
     const normalizedPhone = normalizePhone(phone);
     
-    // Fetch all users and filter by phone pattern
-      const allUsers = await sql`SELECT id, full_name, email, phone, pin, role, region, created_at FROM sat_users LIMIT 100;`;
-    
-    const user = allUsers.find((u: any) => {
-      const userDigits = (u.phone || "").replace(/\D/g, "").slice(-9);
-      return userDigits === normalizedPhone;
-    }) || null;
+    // Query the account directly; a fixed LIMIT could hide existing users.
+    const rows = await sql`
+      SELECT id, full_name, email, phone, pin, role, region, created_at
+      FROM sat_users
+      WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE '%' || ${normalizedPhone}
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `;
+    const user = rows[0] || null;
     
     if (!user) {
       return res.status(404).json({
