@@ -1,9 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "buildCommand": "vite build",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/api/:path(.*)", "destination": "/api/:path" },
     { "source": "/", "destination": "/index.html" },
     { "source": "/:path((?!api/).*)", "destination": "/index.html" }
   ],
@@ -11,23 +12,24 @@
     "NODE_ENV": "production"
   },
   "functions": {
-    "api/index.ts": {
-      "maxDuration": 30
-    },
     "api/[...path].ts": {
       "maxDuration": 30
     },
     "api/auth/verify-pin.ts": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "memory": 1024
     },
     "api/db/products.ts": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "memory": 1024
     },
     "api/db/courses.ts": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "memory": 1024
     },
     "api/db/providers.ts": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "memory": 1024
     }
   }
 }

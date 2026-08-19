@@ -1,6 +1,7 @@
 import { neonDbService } from "../../src/db/neon-service";
+import { withErrorBoundary, VercelRequest, VercelResponse } from "../middleware/handler";
 
-export default async function handler(req: any, res: any) {
+async function providersHandler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ success: false, error: "Méthode non autorisée." });
@@ -14,3 +15,5 @@ export default async function handler(req: any, res: any) {
     return res.json({ success: true, providers: [] });
   }
 }
+
+export default withErrorBoundary(providersHandler);

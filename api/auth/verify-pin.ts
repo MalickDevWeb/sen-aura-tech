@@ -1,25 +1,14 @@
 import { neonDbService } from "../../src/db/neon-service";
+import { withErrorBoundary, readJson, VercelRequest, VercelResponse } from "../middleware/handler";
 
-async function readBody(req: any) {
-  if (req.body) return req.body;
-
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  const rawBody = Buffer.concat(chunks).toString("utf8");
-  return rawBody ? JSON.parse(rawBody) : {};
-}
-
-export default async function handler(req: any, res: any) {
+async function verifyPinHandler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ success: false, error: "Méthode non autorisée." });
   }
 
   try {
-    const { phone, pin } = await readBody(req);
+    const { phone, pin } = await readJson(req);
     if (!phone || !pin) {
       return res.status(400).json({ success: false, error: "Téléphone et PIN requis." });
     }
@@ -64,3 +53,5 @@ export default async function handler(req: any, res: any) {
     });
   }
 }
+
+export default withErrorBoundary(verifyPinHandler);
