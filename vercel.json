@@ -4,7 +4,8 @@
   "buildCommand": "vite build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/:path((?!api/).*)", "destination": "/index.html" }
   ],
   "env": {
     "NODE_ENV": "production"
@@ -14,6 +15,9 @@
       "maxDuration": 30
     },
     "api/[...path].ts": {
+      "maxDuration": 30
+    },
+    "api/auth/verify-pin.ts": {
       "maxDuration": 30
     }
   }
