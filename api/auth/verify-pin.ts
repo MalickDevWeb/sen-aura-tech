@@ -39,50 +39,16 @@ async function verifyPinHandler(req: any, res: any) {
       return res.status(400).json({ success: false, error: "Téléphone et PIN requis." });
     }
 
-    const { neonDbService } = await import("../../src/db/neon-service");
-    const normalizedPhone = neonDbService.normalizePhone(phone);
-    const rows = await neonDbService.getUserByPhone(normalizedPhone);
-    
-    if (!rows) {
-      return res.status(404).json({
-        success: false,
-        error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN.",
-      });
-    }
-
-    if (rows.pin !== pin) {
-      return res.status(401).json({ success: false, error: "Code PIN incorrect." });
-    }
-
-    const userData = rows.data && typeof rows.data === "object" ? rows.data : {};
-    const account = {
-      id: rows.id,
-      fullName: rows.full_name || rows.fullName,
-      email: rows.email,
-      phone: rows.phone,
-      cleanPhone: (rows.phone || "").replace(/\D/g, "").slice(-9),
-      role: rows.role || "CLIENT",
-      region: rows.region || "Dakar",
-      createdAt: rows.created_at || new Date().toISOString(),
-      proStatus: userData.proStatus || rows.proStatus || undefined,
-      proApproved: userData.proApproved || rows.proApproved || false,
-      trialExpiresAt: userData.trialExpiresAt || rows.trialExpiresAt || undefined,
-      proFreeTrialActive: userData.proFreeTrialActive || rows.proFreeTrialActive || false,
-    };
-
-    return res.json({
-      success: true,
-      account,
-      token: signJwt({ sub: account.id, phone: account.phone, role: account.role, email: account.email }),
-    });
-  } catch (err: any) {
-    console.error("[VERIFY_PIN_DATABASE_ERROR]", err?.message || err);
-    const isMissingDatabaseUrl = err?.message?.includes("DATABASE_URL");
+    // Temporary: database not fully operational, return 503
     return res.status(503).json({
       success: false,
-      error: isMissingDatabaseUrl
-        ? "Connexion impossible : la base de données n'est pas configurée sur le serveur."
-        : "Base de données temporairement indisponible. Réessayez dans quelques instants.",
+      error: "Le service de vérification des PIN est actuellement indisponible. Veuillez réessayer ultérieurement.",
+    });
+  } catch (err: any) {
+    console.error("[VERIFY_PIN_ERROR]", err?.message || err);
+    return res.status(500).json({
+      success: false,
+      error: "Erreur serveur.",
     });
   }
 }
