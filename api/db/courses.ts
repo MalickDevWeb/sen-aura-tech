@@ -1,4 +1,3 @@
-import { neonDbService } from "../../src/db/neon-service";
 import { withErrorBoundary, VercelRequest, VercelResponse } from "../middleware/handler";
 
 async function coursesHandler(req: VercelRequest, res: VercelResponse) {
@@ -8,6 +7,7 @@ async function coursesHandler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const { neonDbService } = await import("../../src/db/neon-service");
     const courses = await neonDbService.getAllCourses();
     return res.json({ success: true, courses: courses || [] });
   } catch (err) {

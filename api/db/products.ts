@@ -1,4 +1,3 @@
-import { neonDbService } from "../../src/db/neon-service";
 import { withErrorBoundary, VercelRequest, VercelResponse } from "../middleware/handler";
 
 async function productsHandler(req: VercelRequest, res: VercelResponse) {
@@ -8,6 +7,7 @@ async function productsHandler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const { neonDbService } = await import("../../src/db/neon-service");
     const products = await neonDbService.getAllProducts();
     return res.json({ success: true, products: products || [] });
   } catch (err) {

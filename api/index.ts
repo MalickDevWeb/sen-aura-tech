@@ -2,7 +2,17 @@ import express from "express";
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { neonDbService } from "../src/db/neon-service";
+
+const neonDbService: any = new Proxy({}, {
+  get: (_target, property: string) => (...args: any[]) =>
+    import("../src/db/neon-service.ts").then(({ neonDbService: service }) => {
+      const method = service[property as keyof typeof service];
+      if (typeof method !== "function") {
+        throw new Error(`Neon service method not found: ${property}`);
+      }
+      return method.apply(service, args);
+    }),
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const JWT_EXPIRY = "7d";
