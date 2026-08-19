@@ -259,38 +259,6 @@ export default function App() {
             />
           </Suspense>
 
-          <CartDrawer
-            isOpen={isCartOpen}
-            onClose={() => setIsCartOpen(false)}
-            currency={currency}
-          />
-
-          <QuoteModal
-            isOpen={isQuoteModalOpen}
-            onClose={() => setIsQuoteModalOpen(false)}
-            defaultPole={quotePole}
-            defaultServiceTitle={quoteTitle}
-            onOpenAuthModal={() => setIsAuthModalOpen(true)}
-          />
-
-          <AIAssistantDrawer
-            isOpen={isAiDrawerOpen}
-            onClose={() => setIsAiDrawerOpen(false)}
-            onOpenQuoteWithPrompt={handleOpenQuoteWithPrompt}
-          />
-
-          <AuthModal
-            isOpen={isAuthModalOpen}
-            onClose={() => setIsAuthModalOpen(false)}
-            onSuccess={handleAuthSuccess}
-          />
-
-          <OfficialInvoiceModal
-            isOpen={isInvoiceModalOpen}
-            onClose={() => setIsInvoiceModalOpen(false)}
-            initialInvoice={invoiceModalData}
-            currency={currency}
-          />
         </PrivateLayout>
       ) : (
         <PublicLayout
@@ -373,42 +341,42 @@ export default function App() {
               <NotFoundPage onNavigateHome={() => setActiveTab("home")} />
             )}
           </Suspense>
-
-          {/* Drawers & Modals inside PublicLayout */}
-          <CartDrawer
-            isOpen={isCartOpen}
-            onClose={() => setIsCartOpen(false)}
-            currency={currency}
-          />
-
-          <QuoteModal
-            isOpen={isQuoteModalOpen}
-            onClose={() => setIsQuoteModalOpen(false)}
-            defaultPole={quotePole}
-            defaultServiceTitle={quoteTitle}
-            onOpenAuthModal={() => setIsAuthModalOpen(true)}
-          />
-
-          <AIAssistantDrawer
-            isOpen={isAiDrawerOpen}
-            onClose={() => setIsAiDrawerOpen(false)}
-            onOpenQuoteWithPrompt={handleOpenQuoteWithPrompt}
-          />
-
-          <AuthModal
-            isOpen={isAuthModalOpen}
-            onClose={() => setIsAuthModalOpen(false)}
-            onSuccess={handleAuthSuccess}
-          />
-
-          <OfficialInvoiceModal
-            isOpen={isInvoiceModalOpen}
-            onClose={() => setIsInvoiceModalOpen(false)}
-            initialInvoice={invoiceModalData}
-            currency={currency}
-          />
         </PublicLayout>
       )}
+
+      {/* Global Drawers & Modals (outside layouts to prevent unmounting on navigation) */}
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        currency={currency}
+      />
+
+      <QuoteModal
+        isOpen={isQuoteModalOpen}
+        onClose={() => setIsQuoteModalOpen(false)}
+        defaultPole={quotePole}
+        defaultServiceTitle={quoteTitle}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+      />
+
+      <AIAssistantDrawer
+        isOpen={isAiDrawerOpen}
+        onClose={() => setIsAiDrawerOpen(false)}
+        onOpenQuoteWithPrompt={handleOpenQuoteWithPrompt}
+      />
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
+
+      <OfficialInvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        initialInvoice={invoiceModalData}
+        currency={currency}
+      />
     </SmoothScrollProvider>
   );
 }

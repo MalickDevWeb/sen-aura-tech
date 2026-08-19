@@ -260,15 +260,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const isRoleActive = (r: string) => {
     if (r === "CLIENT" || r === "ADMIN" || r === "AMBASSADOR") return true;
     if (store.currentUser.role === r) {
-      if (store.currentUser.proStatus === "EN_ATTENTE" && !store.currentUser.proApproved) {
-        return false;
-      }
-      if (store.currentUser.proStatus === "ESSAI_GRATUIT" || store.currentUser.proStatus === "ACTIF_ABONNE" || store.currentUser.proApproved) {
+      const u = store.currentUser;
+      // Expired trial → not active
+      if (u.proStatus === "ESSAI_GRATUIT" && u.trialExpiresAt) {
+        const expired = new Date(u.trialExpiresAt) < new Date();
+        if (expired) return false;
         return true;
       }
+      // Active subscriber
+      if (u.proStatus === "ACTIF_ABONNE" || u.proApproved) return true;
+      // Still waiting (never activated)
+      if (u.proStatus === "EN_ATTENTE" && !u.proApproved) return false;
     }
     return proRoleActivations[r]?.active ?? true;
   };
+
+  // Determine pro banner state: "pending" | "expired" | "active"
+  const getProBannerState = (): "pending" | "expired" | "active" => {
+    const u = store.currentUser;
+    if (!u || role === "CLIENT" || role === "ADMIN" || role === "AMBASSADOR") return "active";
+    // Active subscriber → always active
+    if (u.proStatus === "ACTIF_ABONNE" || u.proApproved) return "active";
+    // Trial active and not expired
+    if (u.proStatus === "ESSAI_GRATUIT" && u.trialExpiresAt) {
+      const expired = new Date(u.trialExpiresAt) < new Date();
+      if (!expired) return "active";
+      return "expired"; // trial expired
+    }
+    // Never activated
+    if (u.proStatus === "EN_ATTENTE" || !u.proStatus) return "pending";
+    return "active";
+  };
+  const proBannerState = getProBannerState();
 
   const [adminUsers, setAdminUsers] = useState<any[]>(() => {
     if (store.currentUser.id && store.currentUser.fullName) {
@@ -323,44 +346,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return fetch(path, { ...options, headers });
   };
   const [adminOrders, setAdminOrders] = useState(store.orders);
+  const [proBookings, setProBookings] = useState<any[]>(store.bookings);
   const [proSearch, setProSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
 
   useEffect(() => {
-    authFetch("/api/db/users")
-      .then(r => r.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.users) && data.users.length > 0) {
-          setAdminUsers(data.users.map((u: any) => ({
-            id: u.id,
-            name: u.fullName || u.name,
-            email: u.email,
-            role: u.role || "CLIENT",
-            region: u.city || u.region || "Dakar",
-            status: u.status || "Actif",
-            paymentStatus: u.paymentStatus || "Actif"
-          })));
-        }
-      })
-      .catch(() => {});
+    if (role === "ADMIN") {
+      authFetch("/api/db/users")
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.users) && data.users.length > 0) {
+            setAdminUsers(data.users.map((u: any) => ({
+              id: u.id,
+              name: u.fullName || u.name,
+              email: u.email,
+              role: u.role || "CLIENT",
+              region: u.city || u.region || "Dakar",
+              status: u.status || "Actif",
+              paymentStatus: u.paymentStatus || "Actif"
+            })));
+          }
+        })
+        .catch(() => {});
 
-    // Load admin pros from DB
-    authFetch("/api/db/providers")
-      .then(r => r.json())
-      .then(data => { if (data.success && Array.isArray(data.providers)) setAdminPros(data.providers); })
-      .catch(() => {});
+      // Load admin pros from DB
+      authFetch("/api/db/providers")
+        .then(r => r.json())
+        .then(data => { if (data.success && Array.isArray(data.providers)) setAdminPros(data.providers); })
+        .catch(() => {});
 
-    // Load admin products from DB
-    authFetch("/api/db/products")
-      .then(r => r.json())
-      .then(data => { if (data.success && Array.isArray(data.products)) setAdminProducts(data.products); })
-      .catch(() => {});
+      // Load admin products from DB
+      authFetch("/api/db/products")
+        .then(r => r.json())
+        .then(data => { if (data.success && Array.isArray(data.products)) setAdminProducts(data.products); })
+        .catch(() => {});
 
-    // Load admin orders from DB
-    authFetch("/api/db/orders")
-      .then(r => r.json())
-      .then(data => { if (data.success && Array.isArray(data.orders)) setAdminOrders(data.orders); })
-      .catch(() => {});
+      // Load admin orders from DB
+      authFetch("/api/db/orders")
+        .then(r => r.json())
+        .then(data => { if (data.success && Array.isArray(data.orders)) setAdminOrders(data.orders); })
+        .catch(() => {});
+    }
 
     const loadVendorProducts = () => {
       authFetch("/api/vendor/products")
@@ -382,11 +408,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         .catch(() => {});
     };
 
-    // Load vendeur orders from DB
-    authFetch("/api/db/orders")
-      .then(r => r.json())
-      .then(data => { if (data.success && Array.isArray(data.orders)) setVendeurOrders(data.orders); })
-      .catch(() => {});
+    if (role === "VENDEUR" || role === "ADMIN") {
+      // Load vendeur orders from DB
+      authFetch("/api/db/orders")
+        .then(r => r.json())
+        .then(data => { if (data.success && Array.isArray(data.orders)) setVendeurOrders(data.orders); })
+        .catch(() => {});
+      loadVendorProducts();
+    }
 
     const loadFormateurCourses = () => {
       authFetch("/api/db/courses")
@@ -405,18 +434,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         });
     };
 
-    // Load formateur students from DB
-    authFetch("/api/db/users")
-      .then(r => r.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.users)) {
-          setFormateurStudents(data.users.filter((u: any) => u.role === "CLIENT" && u.enrolledCourses?.length > 0));
-        }
-      })
-      .catch(() => {});
+    if (role === "FORMATEUR" || role === "ADMIN") {
+      // Load formateur students from DB
+      authFetch("/api/db/users")
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.users)) {
+            setFormateurStudents(data.users.filter((u: any) => u.role === "CLIENT" && u.enrolledCourses?.length > 0));
+          }
+        })
+        .catch(() => {});
+      loadFormateurCourses();
+    }
 
-    loadVendorProducts();
-    loadFormateurCourses();
+    if (role === "PROFESSIONAL") {
+      authFetch("/api/pro/bookings")
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.bookings)) {
+            setProBookings(data.bookings);
+          }
+        })
+        .catch(() => {});
+    }
 
     const handleProductSync = (e: any) => {
       if (e?.detail) {
@@ -605,8 +645,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
 
 
-      {/* --- PRO ACCOUNT ACTIVATION & WAITING FOR VALIDATION BANNER (WITH FREE TRIAL LAUNCH OFFER) --- */}
-      {role !== "CLIENT" && role !== "ADMIN" && role !== "AMBASSADOR" && !isRoleActive(role) && (
+      {/* --- PRO ACCOUNT BANNER: PENDING (never activated) --- */}
+      {proBannerState === "pending" && role !== "CLIENT" && role !== "ADMIN" && role !== "AMBASSADOR" && (
         <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border-2 border-amber-500/40 space-y-6 text-slate-200 shadow-2xl relative overflow-hidden max-w-4xl mx-auto my-6 animate-in fade-in duration-300">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-4 border-b border-slate-800">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
@@ -629,14 +669,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
             <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
               <Phone className="w-4 h-4" />
-              <span>Notification de Validation par WhatsApp & Email</span>
+              <span>Notification de Validation par WhatsApp &amp; Email</span>
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed">
               Dès que la direction aura examiné et validé votre dossier, vous recevrez automatiquement un message de confirmation officiel par <strong>WhatsApp</strong> et par <strong>Email</strong> avec vos accès complets.
             </p>
           </div>
 
-          {/* Offre de Gratuité de Lancement (Early Adopter Offer) */}
+          {/* Offre Essai Gratuit */}
           <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-emerald-500/15 border border-amber-500/40 space-y-3">
             <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
               <Sparkles className="w-5 h-5 text-amber-400" />
@@ -672,15 +712,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Bottom Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
             <button
-              onClick={() => {
-                store.switchRole("CLIENT");
-              }}
+              onClick={() => { store.switchRole("CLIENT"); }}
               className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs flex items-center gap-2 cursor-pointer"
             >
               <User className="w-4 h-4 text-amber-400" />
               <span>Accéder à l'Espace Client (Accès Libre)</span>
             </button>
-
             <a
               href="https://wa.me/221705334611?text=Bonjour%20SuperAdmin%20SEN%20AURA%20TECH%2C%20je%20souhaite%20valider%20mon%20compte%20professionnel."
               target="_blank"
@@ -690,6 +727,71 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Phone className="w-4 h-4 text-emerald-400" />
               <span>Contacter le Support SuperAdmin (WhatsApp)</span>
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* --- PRO ACCOUNT BANNER: EXPIRED (trial ended OR subscription ended) --- */}
+      {proBannerState === "expired" && role !== "CLIENT" && role !== "ADMIN" && role !== "AMBASSADOR" && (
+        <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border-2 border-rose-500/40 space-y-5 text-slate-200 shadow-2xl relative overflow-hidden max-w-4xl mx-auto my-6 animate-in fade-in duration-300">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-4 border-b border-rose-500/20">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-black text-white">Période d'Accès Terminée</h2>
+                <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 text-xs font-mono font-bold border border-rose-500/40">
+                  Statut : Expiré ❌
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Votre {store.currentUser.proStatus === "ESSAI_GRATUIT" ? "essai gratuit de 30 jours" : "abonnement mensuel"} a expiré. Renouvelez pour continuer à recevoir des missions et être visible des clients SEN AURA TECH.
+              </p>
+            </div>
+          </div>
+
+          {/* Renewal options */}
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-rose-500/10 via-amber-500/10 to-emerald-500/10 border border-amber-500/30 space-y-4">
+            <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              <span>Renouveler votre Abonnement Pro — 25,000 FCFA / mois</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-300">
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <p className="font-bold text-white">✅ Ce que vous débloquez :</p>
+                <p>• Visibilité en temps réel sur la plateforme</p>
+                <p>• Réception de nouvelles demandes clients</p>
+                <p>• Gestion complète de votre profil Pro</p>
+                <p>• Tableau de bord missions & revenus</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <p className="font-bold text-amber-400">💳 Comment renouveler :</p>
+                <p>Réglez <strong>25,000 FCFA</strong> par :</p>
+                <p>• <strong>Wave</strong> ou <strong>Orange Money</strong></p>
+                <p>• au <strong className="text-amber-400 font-mono">+221 70 533 46 11</strong></p>
+                <p>• puis contactez le SuperAdmin sur WhatsApp pour activation immédiate</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <a
+              href={`https://wa.me/221705334611?text=Bonjour%20SuperAdmin%2C%20je%20souhaite%20renouveler%20mon%20abonnement%20Pro%20SEN%20AURA%20TECH%20(${encodeURIComponent(store.currentUser.fullName || '')}%20-%20${encodeURIComponent(store.currentUser.phone || '')}).`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Renouveler via WhatsApp (Activation Immédiate)</span>
+            </a>
+            <button
+              onClick={() => { store.switchRole("CLIENT"); }}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs flex items-center gap-2 cursor-pointer"
+            >
+              <User className="w-4 h-4 text-amber-400" />
+              <span>Accéder à l'Espace Client</span>
+            </button>
           </div>
         </div>
       )}
@@ -1750,7 +1852,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {proTab === "missions" && (
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-white">Offres d'Intervention à Proximité (Sénégal)</h3>
-              {store.bookings.length === 0 ? (
+              {proBookings.length === 0 ? (
                 <div className="p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-2">
                   <Wrench className="w-8 h-8 text-slate-600 mx-auto" />
                   <p className="text-sm font-bold text-slate-300">Aucune demande d'intervention pour le moment</p>
@@ -1760,7 +1862,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {store.bookings.map((m) => {
+                  {proBookings.map((m) => {
                     const isAccepted = acceptedMissions.includes(m.id);
                     return (
                       <div key={m.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 flex flex-col justify-between">

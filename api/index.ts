@@ -573,6 +573,17 @@ app.post("/api/db/bookings", requireAuth, async (req, res) => {
   }
 });
 
+// Endpoint accessible aux prestataires pro (sans requireAdmin) pour voir toutes les demandes d'intervention disponibles
+app.get("/api/pro/bookings", requireAuth, async (_req, res) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const bookings = await neonDbService.getAllBookings();
+    res.json({ success: true, bookings });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", bookings: [] });
+  }
+});
+
 app.get("/api/db/orders", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -670,6 +681,47 @@ app.post("/api/auth/check-uniqueness", async (req, res) => {
   }
 });
 
+app.post("/api/auth/verify-pin", async (req, res) => {
+  try {
+    const { phone, pin } = req.body;
+    if (!phone || !pin) {
+      return res.status(400).json({ success: false, error: "Téléphone et PIN requis" });
+    }
+    
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const user = await neonDbService.getUserByPhone(phone);
+
+    if (!user) {
+      return res.json({ success: false, error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN." });
+    }
+
+    if (user.pin !== pin) {
+      return res.json({ success: false, error: "Code PIN incorrect." });
+    }
+
+    const userData = (user.data && typeof user.data === "object") ? user.data : {};
+    
+    const account = {
+      id: user.id,
+      fullName: user.full_name || user.fullName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      region: user.region || "Dakar",
+      createdAt: user.created_at || new Date().toISOString(),
+      proStatus: userData.proStatus || user.proStatus || undefined,
+      proApproved: userData.proApproved || user.proApproved || false,
+      trialExpiresAt: userData.trialExpiresAt || user.trialExpiresAt || undefined,
+      proFreeTrialActive: userData.proFreeTrialActive || user.proFreeTrialActive || false,
+    };
+
+    res.json({ success: true, account });
+  } catch (err: any) {
+    console.error("verify-pin error:", err);
+    res.status(500).json({ success: false, error: "Erreur serveur lors de la vérification du PIN." });
+  }
+});
+
 // Dual-mode: accepts JWT token (update) OR phone+PIN (first login)
 app.post("/api/db/users/sync", async (req, res) => {
   try {
@@ -734,7 +786,7 @@ app.get("/api/db/users", requireAuth, requireAdmin, async (_req, res) => {
 });
 
 // Products & Boutique
-app.get("/api/db/products", requireAuth, async (_req, res) => {
+app.get("/api/db/products", async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const products = await neonDbService.getAllProducts();
@@ -794,7 +846,7 @@ app.delete("/api/db/products/:id", requireAuth, requireAdmin, async (req, res) =
 });
 
 // Courses & Academy
-app.get("/api/db/courses", requireAuth, async (_req, res) => {
+app.get("/api/db/courses", async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const courses = await neonDbService.getAllCourses();
@@ -849,7 +901,7 @@ app.delete("/api/db/courses/:id", requireAuth, requireAdmin, async (req, res) =>
 });
 
 // Providers & Pros
-app.get("/api/db/providers", requireAuth, async (_req, res) => {
+app.get("/api/db/providers", async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const providers = await neonDbService.getAllProviders();

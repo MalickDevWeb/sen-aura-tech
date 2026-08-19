@@ -490,10 +490,10 @@ export class SecurityPinService {
         } catch {}
         return { success: true, account: accountToCache };
       } else if (response.status === 401 || !data.success) {
-        return { success: false, error: data.error || "Code PIN incorrect." };
+        throw new Error(data.error || "Code PIN incorrect.");
       }
-    } catch (err) {
-      console.warn("Backend auth failed, falling back to local storage...", err);
+    } catch (err: any) {
+      console.warn("Backend auth failed, falling back to local storage...", err?.message);
     }
 
     // 2. Fallback: Vérification Locale PWA (Mode hors-ligne)

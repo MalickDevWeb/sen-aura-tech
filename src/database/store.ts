@@ -38,13 +38,41 @@ class Store {
   private async initDatabaseSync() {
     // Synchronisation Neon PostgreSQL
     try {
+      const token = this.getAuthToken();
+
+      const productsPromise = authFetch("/api/db/products").then((r) => r.json()).catch(() => ({ products: [] }));
+      const coursesPromise = authFetch("/api/db/courses").then((r) => r.json()).catch(() => ({ courses: [] }));
+      const providersPromise = authFetch("/api/db/providers").then((r) => r.json()).catch(() => ({ providers: [] }));
+
+      let quotesPromise = Promise.resolve({ quotes: [] });
+      let bookingsPromise = Promise.resolve({ bookings: [] });
+      let ordersPromise = Promise.resolve({ orders: [] });
+
+      let isAdmin = false;
+      if (token) {
+        try {
+          const payloadB64 = token.split('.')[1];
+          const payloadStr = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
+          const payload = JSON.parse(payloadStr);
+          if (payload.role === "ADMIN") {
+            isAdmin = true;
+          }
+        } catch (e) {}
+      }
+
+      if (isAdmin) {
+        quotesPromise = authFetch("/api/db/quotes").then((r) => r.json()).catch(() => ({ quotes: [] }));
+        bookingsPromise = authFetch("/api/db/bookings").then((r) => r.json()).catch(() => ({ bookings: [] }));
+        ordersPromise = authFetch("/api/db/orders").then((r) => r.json()).catch(() => ({ orders: [] }));
+      }
+
       const [quotesRes, bookingsRes, ordersRes, productsRes, coursesRes, providersRes] = await Promise.all([
-        authFetch("/api/db/quotes").then((r) => r.json()).catch(() => ({ quotes: [] })),
-        authFetch("/api/db/bookings").then((r) => r.json()).catch(() => ({ bookings: [] })),
-        authFetch("/api/db/orders").then((r) => r.json()).catch(() => ({ orders: [] })),
-        authFetch("/api/db/products").then((r) => r.json()).catch(() => ({ products: [] })),
-        authFetch("/api/db/courses").then((r) => r.json()).catch(() => ({ courses: [] })),
-        authFetch("/api/db/providers").then((r) => r.json()).catch(() => ({ providers: [] })),
+        quotesPromise,
+        bookingsPromise,
+        ordersPromise,
+        productsPromise,
+        coursesPromise,
+        providersPromise,
       ]);
 
       if (quotesRes?.quotes && quotesRes.quotes.length > 0) {

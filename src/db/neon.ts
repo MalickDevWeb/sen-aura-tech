@@ -449,6 +449,32 @@ export async function initializeDatabase(): Promise<void> {
           )
         `;
 
+        // 14. Portfolio Pro / Réalisations Chantiers
+        await sql`
+          CREATE TABLE IF NOT EXISTS sat_pro_portfolio (
+            id VARCHAR(100) PRIMARY KEY,
+            pro_id VARCHAR(100) NOT NULL,
+            pro_name VARCHAR(255) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            specialty VARCHAR(255) NOT NULL,
+            location VARCHAR(255) NOT NULL,
+            estimated_cost_fcfa INT DEFAULT 0,
+            execution_time VARCHAR(100),
+            description TEXT,
+            guarantee_period VARCHAR(100),
+            main_media_url TEXT NOT NULL,
+            main_media_type VARCHAR(50) DEFAULT 'image',
+            gallery_images TEXT[] DEFAULT '{}',
+            verified_badge BOOLEAN DEFAULT true,
+            rating DECIMAL(3,2) DEFAULT 5.0,
+            views_count INT DEFAULT 0,
+            contacts_count INT DEFAULT 0,
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+
         // === CREATION OF PERFORMANCE INDEXES FOR RAPID SEARCH & RETRIEVAL ===
         const indexQueries = [
           // Users
@@ -504,7 +530,12 @@ export async function initializeDatabase(): Promise<void> {
           `CREATE INDEX IF NOT EXISTS sat_challenges_sector_idx ON sat_challenges (sector);`,
           // Publications (Type, Active, Draft, Program/Solution/Challenge)
           `CREATE INDEX IF NOT EXISTS sat_publications_type_idx ON sat_publications (type);`,
-          `CREATE INDEX IF NOT EXISTS sat_publications_is_active_idx ON sat_publications (is_active);`
+          `CREATE INDEX IF NOT EXISTS sat_publications_is_active_idx ON sat_publications (is_active);`,
+          // Pro Portfolio (Pro ID, Specialty, Active, Created)
+          `CREATE INDEX IF NOT EXISTS sat_pro_portfolio_pro_id_idx ON sat_pro_portfolio (pro_id);`,
+          `CREATE INDEX IF NOT EXISTS sat_pro_portfolio_specialty_idx ON sat_pro_portfolio (specialty);`,
+          `CREATE INDEX IF NOT EXISTS sat_pro_portfolio_active_idx ON sat_pro_portfolio (is_active);`,
+          `CREATE INDEX IF NOT EXISTS sat_pro_portfolio_created_idx ON sat_pro_portfolio (created_at DESC);`
         ];
 
         for (const q of indexQueries) {
