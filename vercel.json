@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "vite build && esbuild api/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/api/index.cjs",
+  "buildCommand": "vite build && esbuild api/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=api/index.cjs",
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index.cjs" }
