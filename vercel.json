@@ -19,6 +19,15 @@
     },
     "api/auth/verify-pin.ts": {
       "maxDuration": 30
+    },
+    "api/db/products.ts": {
+      "maxDuration": 30
+    },
+    "api/db/courses.ts": {
+      "maxDuration": 30
+    },
+    "api/db/providers.ts": {
+      "maxDuration": 30
     }
   }
 }
