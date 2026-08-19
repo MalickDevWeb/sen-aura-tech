@@ -39,43 +39,35 @@ async function verifyPinHandler(req: any, res: any) {
       return res.status(400).json({ success: false, error: "Téléphone et PIN requis." });
     }
 
-    const { sql } = await import("../../src/db/neon");
-    const normalizedPhone = String(phone).replace(/\D/g, "").slice(-9);
-    if (normalizedPhone.length !== 9) {
-      return res.status(400).json({ success: false, error: "Numéro de téléphone invalide." });
-    }
-
-    const rows = await sql`
-      SELECT * FROM sat_users
-      WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE '%' || ${normalizedPhone}
-      LIMIT 1;
-    `;
-    const user = rows[0] || null;
-    if (!user) {
+    const { neonDbService } = await import("../../src/db/neon-service");
+    const normalizedPhone = neonDbService.normalizePhone(phone);
+    const rows = await neonDbService.getUserByPhone(normalizedPhone);
+    
+    if (!rows) {
       return res.status(404).json({
         success: false,
         error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN.",
       });
     }
 
-    if (user.pin !== pin) {
+    if (rows.pin !== pin) {
       return res.status(401).json({ success: false, error: "Code PIN incorrect." });
     }
 
-    const userData = user.data && typeof user.data === "object" ? user.data : {};
+    const userData = rows.data && typeof rows.data === "object" ? rows.data : {};
     const account = {
-      id: user.id,
-      fullName: user.full_name || user.fullName,
-      email: user.email,
-      phone: user.phone,
-      cleanPhone: (user.phone || "").replace(/\D/g, "").slice(-9),
-      role: user.role || "CLIENT",
-      region: user.region || "Dakar",
-      createdAt: user.created_at || new Date().toISOString(),
-      proStatus: userData.proStatus || user.proStatus || undefined,
-      proApproved: userData.proApproved || user.proApproved || false,
-      trialExpiresAt: userData.trialExpiresAt || user.trialExpiresAt || undefined,
-      proFreeTrialActive: userData.proFreeTrialActive || user.proFreeTrialActive || false,
+      id: rows.id,
+      fullName: rows.full_name || rows.fullName,
+      email: rows.email,
+      phone: rows.phone,
+      cleanPhone: (rows.phone || "").replace(/\D/g, "").slice(-9),
+      role: rows.role || "CLIENT",
+      region: rows.region || "Dakar",
+      createdAt: rows.created_at || new Date().toISOString(),
+      proStatus: userData.proStatus || rows.proStatus || undefined,
+      proApproved: userData.proApproved || rows.proApproved || false,
+      trialExpiresAt: userData.trialExpiresAt || rows.trialExpiresAt || undefined,
+      proFreeTrialActive: userData.proFreeTrialActive || rows.proFreeTrialActive || false,
     };
 
     return res.json({
