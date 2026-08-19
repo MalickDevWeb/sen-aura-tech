@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-const { neon } = require("@neondatabase/serverless");
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const DATABASE_URL = process.env.DATABASE_URL || "";
@@ -55,6 +54,8 @@ async function verifyPinHandler(req: any, res: any) {
       });
     }
 
+    // Import neon dynamically
+    const { neon } = await import("@neondatabase/serverless");
     const sql = neon(DATABASE_URL);
     const normalizedPhone = normalizePhone(phone);
     
