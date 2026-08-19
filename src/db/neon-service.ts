@@ -39,7 +39,7 @@ export const neonDbService = {
       if (normalizedPhone) {
         const phoneResult = await sql`
           SELECT * FROM sat_users 
-          WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE '%' || ${normalizedPhone}
+          WHERE REGEXP_REPLACE(phone, '[^0-9]', '') LIKE '%' || ${normalizedPhone}
           ${excludeUserId ? sql`AND id != ${excludeUserId}` : sql``}
           LIMIT 1;
         `;
@@ -166,7 +166,7 @@ export const neonDbService = {
       if (!normalizedPhone) return null;
       const result = await sql`
         SELECT * FROM sat_users 
-        WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE '%' || ${normalizedPhone}
+        WHERE REGEXP_REPLACE(phone, '[^0-9]', '') LIKE '%' || ${normalizedPhone}
         LIMIT 1;
       `;
       return result[0] || null;
