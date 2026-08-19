@@ -1,5 +1,15 @@
-import { neonDbService } from "../../src/db/neon-service";
+import crypto from "crypto";
 import { withErrorBoundary, readJson, VercelRequest, VercelResponse } from "../middleware/handler";
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+
+function signJwt(payload: Record<string, unknown>) {
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const now = Math.floor(Date.now() / 1000);
+  const body = Buffer.from(JSON.stringify({ ...payload, iat: now, exp: now + 7 * 24 * 60 * 60 })).toString("base64url");
+  const signature = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
+  return `${header}.${body}.${signature}`;
+}
 
 async function verifyPinHandler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -8,6 +18,7 @@ async function verifyPinHandler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const { neonDbService } = await import("../../src/db/neon-service");
     const { phone, pin } = await readJson(req);
     if (!phone || !pin) {
       return res.status(400).json({ success: false, error: "Téléphone et PIN requis." });
@@ -26,22 +37,25 @@ async function verifyPinHandler(req: VercelRequest, res: VercelResponse) {
     }
 
     const userData = user.data && typeof user.data === "object" ? user.data : {};
+    const account = {
+      id: user.id,
+      fullName: user.full_name || user.fullName,
+      email: user.email,
+      phone: user.phone,
+      cleanPhone: (user.phone || "").replace(/\D/g, "").slice(-9),
+      role: user.role || "CLIENT",
+      region: user.region || "Dakar",
+      createdAt: user.created_at || new Date().toISOString(),
+      proStatus: userData.proStatus || user.proStatus || undefined,
+      proApproved: userData.proApproved || user.proApproved || false,
+      trialExpiresAt: userData.trialExpiresAt || user.trialExpiresAt || undefined,
+      proFreeTrialActive: userData.proFreeTrialActive || user.proFreeTrialActive || false,
+    };
+
     return res.json({
       success: true,
-      account: {
-        id: user.id,
-        fullName: user.full_name || user.fullName,
-        email: user.email,
-        phone: user.phone,
-        cleanPhone: (user.phone || "").replace(/\D/g, "").slice(-9),
-        role: user.role || "CLIENT",
-        region: user.region || "Dakar",
-        createdAt: user.created_at || new Date().toISOString(),
-        proStatus: userData.proStatus || user.proStatus || undefined,
-        proApproved: userData.proApproved || user.proApproved || false,
-        trialExpiresAt: userData.trialExpiresAt || user.trialExpiresAt || undefined,
-        proFreeTrialActive: userData.proFreeTrialActive || user.proFreeTrialActive || false,
-      },
+      account,
+      token: signJwt({ sub: account.id, phone: account.phone, role: account.role, email: account.email }),
     });
   } catch (err: any) {
     const isMissingDatabaseUrl = err?.message?.includes("DATABASE_URL");
