@@ -1530,5 +1530,336 @@ export const neonDbService = {
       console.error(`Neon deleteRecord(${id}) error:`, e);
       return false;
     }
-  }
+  },
+
+  // === 14. PROGRAMS / INITIATIVES / FLAGSHIP ===
+  async getAllPrograms() {
+    try {
+      await this.ensureDb();
+      const rows = await sql`SELECT * FROM sat_programs ORDER BY created_at DESC;`;
+      return rows.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        slug: r.slug,
+        description: r.description,
+        category: r.category,
+        status: r.status || "ACTIF",
+        isFlagship: r.is_flagship || false,
+        isDraft: r.is_draft || false,
+        sprintDurationDays: r.sprint_duration_days || 7,
+        startDate: r.start_date ? new Date(r.start_date).toISOString() : undefined,
+        endDate: r.end_date ? new Date(r.end_date).toISOString() : undefined,
+        metadata: r.metadata || {},
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+      }));
+    } catch (e) {
+      console.error("Neon getAllPrograms error:", e);
+      return [];
+    }
+  },
+
+  async saveProgram(program: any) {
+    try {
+      await this.ensureDb();
+      const result = await sql`
+        INSERT INTO sat_programs (id, title, slug, description, category, status, is_flagship, is_draft, sprint_duration_days, start_date, end_date, metadata)
+        VALUES (
+          ${program.id},
+          ${program.title},
+          ${program.slug || null},
+          ${program.description || null},
+          ${program.category || null},
+          ${program.status || "ACTIF"},
+          ${program.isFlagship || program.is_flagship || false},
+          ${program.isDraft || program.is_draft || false},
+          ${program.sprintDurationDays || program.sprint_duration_days || 7},
+          ${program.startDate ? new Date(program.startDate) : null},
+          ${program.endDate ? new Date(program.endDate) : null},
+          ${JSON.stringify(program.metadata || {})}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          slug = EXCLUDED.slug,
+          description = EXCLUDED.description,
+          category = EXCLUDED.category,
+          status = EXCLUDED.status,
+          is_flagship = EXCLUDED.is_flagship,
+          is_draft = EXCLUDED.is_draft,
+          sprint_duration_days = EXCLUDED.sprint_duration_days,
+          start_date = EXCLUDED.start_date,
+          end_date = EXCLUDED.end_date,
+          metadata = EXCLUDED.metadata,
+          updated_at = NOW()
+        RETURNING *;
+      `;
+      return result[0];
+    } catch (e) {
+      console.error("Neon saveProgram error:", e);
+      return null;
+    }
+  },
+
+  async deleteProgram(id: string) {
+    try {
+      await this.ensureDb();
+      await sql`DELETE FROM sat_programs WHERE id = ${id};`;
+      return true;
+    } catch (e) {
+      console.error("Neon deleteProgram error:", e);
+      return false;
+    }
+  },
+
+  // === 15. SOLUTIONS ===
+  async getAllSolutions() {
+    try {
+      await this.ensureDb();
+      const rows = await sql`SELECT * FROM sat_solutions ORDER BY sprint_number ASC, created_at DESC;`;
+      return rows.map((r: any) => ({
+        id: r.id,
+        programId: r.program_id,
+        title: r.title,
+        slug: r.slug,
+        description: r.description,
+        category: r.category,
+        status: r.status || "LIVRE",
+        sprintNumber: r.sprint_number || 0,
+        impactMetric: r.impact_metric || null,
+        metrics: r.metrics || {},
+        stackTech: r.stack_tech || [],
+        imageUrl: r.image_url,
+        demoUrl: r.demo_url,
+        isPublished: r.is_published !== false,
+        isDraft: r.is_draft || false,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+      }));
+    } catch (e) {
+      console.error("Neon getAllSolutions error:", e);
+      return [];
+    }
+  },
+
+  async saveSolution(solution: any) {
+    try {
+      await this.ensureDb();
+      const result = await sql`
+        INSERT INTO sat_solutions (id, program_id, title, slug, description, category, status, sprint_number, impact_metric, metrics, stack_tech, image_url, demo_url, is_published, is_draft)
+        VALUES (
+          ${solution.id},
+          ${solution.programId || null},
+          ${solution.title},
+          ${solution.slug || null},
+          ${solution.description || null},
+          ${solution.category || null},
+          ${solution.status || "LIVRE"},
+          ${solution.sprintNumber || 0},
+          ${solution.impactMetric || null},
+          ${JSON.stringify(solution.metrics || {})},
+          ${JSON.stringify(solution.stackTech || [])},
+          ${solution.imageUrl || null},
+          ${solution.demoUrl || null},
+          ${solution.isPublished !== false},
+          ${solution.isDraft || false}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          program_id = EXCLUDED.program_id,
+          title = EXCLUDED.title,
+          slug = EXCLUDED.slug,
+          description = EXCLUDED.description,
+          category = EXCLUDED.category,
+          status = EXCLUDED.status,
+          sprint_number = EXCLUDED.sprint_number,
+          impact_metric = EXCLUDED.impact_metric,
+          metrics = EXCLUDED.metrics,
+          stack_tech = EXCLUDED.stack_tech,
+          image_url = EXCLUDED.image_url,
+          demo_url = EXCLUDED.demo_url,
+          is_published = EXCLUDED.is_published,
+          is_draft = EXCLUDED.is_draft,
+          updated_at = NOW()
+        RETURNING *;
+      `;
+      return result[0];
+    } catch (e) {
+      console.error("Neon saveSolution error:", e);
+      return null;
+    }
+  },
+
+  async deleteSolution(id: string) {
+    try {
+      await this.ensureDb();
+      await sql`DELETE FROM sat_solutions WHERE id = ${id};`;
+      return true;
+    } catch (e) {
+      console.error("Neon deleteSolution error:", e);
+      return false;
+    }
+  },
+
+  // === 16. CHALLENGES / IDEES ===
+  async getAllChallenges() {
+    try {
+      await this.ensureDb();
+      const rows = await sql`SELECT * FROM sat_challenges ORDER BY created_at DESC;`;
+      return rows.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        submittedByName: r.submitted_by_name,
+        submittedByEmail: r.submitted_by_email,
+        submittedByPhone: r.submitted_by_phone,
+        sector: r.sector,
+        city: r.city,
+        estimatedBudgetFCFA: Number(r.estimated_budget_fcfa) || 0,
+        status: r.status || "EN_ATTENTE",
+        isPublished: r.is_published || false,
+        metadata: r.metadata || {},
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+      }));
+    } catch (e) {
+      console.error("Neon getAllChallenges error:", e);
+      return [];
+    }
+  },
+
+  async saveChallenge(challenge: any) {
+    try {
+      await this.ensureDb();
+      const result = await sql`
+        INSERT INTO sat_challenges (id, title, description, submitted_by_name, submitted_by_email, submitted_by_phone, sector, city, estimated_budget_fcfa, status, is_published, metadata)
+        VALUES (
+          ${challenge.id},
+          ${challenge.title},
+          ${challenge.description || null},
+          ${challenge.submittedByName || null},
+          ${challenge.submittedByEmail || null},
+          ${challenge.submittedByPhone || null},
+          ${challenge.sector || null},
+          ${challenge.city || null},
+          ${Number(challenge.estimatedBudgetFCFA || 0)},
+          ${challenge.status || "EN_ATTENTE"},
+          ${challenge.isPublished || false},
+          ${JSON.stringify(challenge.metadata || {})}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          submitted_by_name = EXCLUDED.submitted_by_name,
+          submitted_by_email = EXCLUDED.submitted_by_email,
+          submitted_by_phone = EXCLUDED.submitted_by_phone,
+          sector = EXCLUDED.sector,
+          city = EXCLUDED.city,
+          estimated_budget_fcfa = EXCLUDED.estimated_budget_fcfa,
+          status = EXCLUDED.status,
+          is_published = EXCLUDED.is_published,
+          metadata = EXCLUDED.metadata,
+          updated_at = NOW()
+        RETURNING *;
+      `;
+      return result[0];
+    } catch (e) {
+      console.error("Neon saveChallenge error:", e);
+      return null;
+    }
+  },
+
+  async deleteChallenge(id: string) {
+    try {
+      await this.ensureDb();
+      await sql`DELETE FROM sat_challenges WHERE id = ${id};`;
+      return true;
+    } catch (e) {
+      console.error("Neon deleteChallenge error:", e);
+      return false;
+    }
+  },
+
+  // === 17. PUBLICATIONS / ADS ===
+  async getAllPublications() {
+    try {
+      await this.ensureDb();
+      const rows = await sql`SELECT * FROM sat_publications ORDER BY published_at DESC, created_at DESC;`;
+      return rows.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        body: r.body,
+        type: r.type || "SOLUTION",
+        programId: r.program_id,
+        solutionId: r.solution_id,
+        challengeId: r.challenge_id,
+        mediaUrl: r.media_url,
+        mediaType: r.media_type,
+        callToAction: r.call_to_action,
+        targetUrl: r.target_url,
+        isActive: r.is_active !== false,
+        isDraft: r.is_draft || false,
+        publishedAt: r.published_at ? new Date(r.published_at).toISOString() : null,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+      }));
+    } catch (e) {
+      console.error("Neon getAllPublications error:", e);
+      return [];
+    }
+  },
+
+  async savePublication(publication: any) {
+    try {
+      await this.ensureDb();
+      const result = await sql`
+        INSERT INTO sat_publications (id, title, body, type, program_id, solution_id, challenge_id, media_url, media_type, call_to_action, target_url, is_active, is_draft, published_at)
+        VALUES (
+          ${publication.id},
+          ${publication.title},
+          ${publication.body || null},
+          ${publication.type || "SOLUTION"},
+          ${publication.programId || null},
+          ${publication.solutionId || null},
+          ${publication.challengeId || null},
+          ${publication.mediaUrl || null},
+          ${publication.mediaType || null},
+          ${publication.callToAction || null},
+          ${publication.targetUrl || null},
+          ${publication.isActive !== false},
+          ${publication.isDraft || false},
+          ${publication.publishedAt ? new Date(publication.publishedAt) : new Date()}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          body = EXCLUDED.body,
+          type = EXCLUDED.type,
+          program_id = EXCLUDED.program_id,
+          solution_id = EXCLUDED.solution_id,
+          challenge_id = EXCLUDED.challenge_id,
+          media_url = EXCLUDED.media_url,
+          media_type = EXCLUDED.media_type,
+          call_to_action = EXCLUDED.call_to_action,
+          target_url = EXCLUDED.target_url,
+          is_active = EXCLUDED.is_active,
+          is_draft = EXCLUDED.is_draft,
+          published_at = EXCLUDED.published_at,
+          updated_at = NOW()
+        RETURNING *;
+      `;
+      return result[0];
+    } catch (e) {
+      console.error("Neon savePublication error:", e);
+      return null;
+    }
+  },
+
+  async deletePublication(id: string) {
+    try {
+      await this.ensureDb();
+      await sql`DELETE FROM sat_publications WHERE id = ${id};`;
+      return true;
+    } catch (e) {
+      console.error("Neon deletePublication error:", e);
+      return false;
+    }
+  },
 };

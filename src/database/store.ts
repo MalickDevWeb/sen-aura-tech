@@ -1,15 +1,7 @@
 import { UserDTO, QuoteRequestDTO, BookingDTO, CartItemDTO, OrderDTO, TicketDTO, UserRole, ProfileType, ProfileSubscriptionDTO, UserProfileDataDTO, ProductDTO } from "../shared/contracts/types";
 import { eventBus, EVENTS } from "../shared/events/event-bus";
 import { PROFILES_METADATA, buildDefaultUserProfiles } from "../config/profilesConfig";
-import {
-  saveQuoteToFirestore,
-  subscribeQuotesFromFirestore,
-  saveBookingToFirestore,
-  subscribeBookingsFromFirestore,
-  saveOrderToFirestore,
-  subscribeOrdersFromFirestore,
-  saveTicketToFirestore
-} from "../lib/firestore-service";
+// Firestore imports removed
 
 class Store {
   isLoggedIn: boolean = false;
@@ -76,30 +68,10 @@ class Store {
       console.info("Neon fetch initialization fallback");
     }
 
-    // 2. Real-time Firebase Firestore Sync
-    subscribeQuotesFromFirestore((updatedQuotes) => {
-      const existingIds = new Set(this.quotes.map((q) => q.id));
-      const newQuotes = updatedQuotes.filter((q) => !existingIds.has(q.id));
-      if (newQuotes.length > 0) {
-        this.quotes = [...newQuotes, ...this.quotes];
-      }
-    });
-
-    subscribeBookingsFromFirestore((updatedBookings) => {
-      const existingIds = new Set(this.bookings.map((b) => b.id));
-      const newBookings = updatedBookings.filter((b) => !existingIds.has(b.id));
-      if (newBookings.length > 0) {
-        this.bookings = [...newBookings, ...this.bookings];
-      }
-    });
-
-    subscribeOrdersFromFirestore((updatedOrders) => {
-      const existingIds = new Set(this.orders.map((o) => o.id));
-      const newOrders = updatedOrders.filter((o) => !existingIds.has(o.id));
-      if (newOrders.length > 0) {
-        this.orders = [...newOrders, ...this.orders];
-      }
-    });
+    // 2. Real-time Firebase Firestore Sync (DISABLED to rely purely on Neon DB)
+    // subscribeQuotesFromFirestore((updatedQuotes) => { ... });
+    // subscribeBookingsFromFirestore((updatedBookings) => { ... });
+    // subscribeOrdersFromFirestore((updatedOrders) => { ... });
   }
 
   async loginWithPhone(
@@ -355,7 +327,7 @@ class Store {
 
   addQuote(quote: QuoteRequestDTO) {
     this.quotes.unshift(quote);
-    saveQuoteToFirestore(quote);
+    // saveQuoteToFirestore(quote);
 
     // Save to Neon PostgreSQL & In-Memory backend
     fetch("/api/quotes/submit", {
@@ -371,7 +343,7 @@ class Store {
     const idx = this.quotes.findIndex((q) => q.id === id);
     if (idx >= 0) {
       this.quotes[idx] = { ...this.quotes[idx], ...updates };
-      saveQuoteToFirestore(this.quotes[idx]);
+      // saveQuoteToFirestore(this.quotes[idx]);
       
       fetch(`/api/quotes/${id}/proposal`, {
         method: "PUT",
@@ -419,7 +391,7 @@ class Store {
   // Réservations & Interventions Pro
   addBooking(booking: BookingDTO) {
     this.bookings.unshift(booking);
-    saveBookingToFirestore(booking);
+    // saveBookingToFirestore(booking);
 
     // Save to Neon PostgreSQL
     fetch("/api/db/bookings", {
@@ -458,7 +430,7 @@ class Store {
 
   placeOrder(order: OrderDTO) {
     this.orders.unshift(order);
-    saveOrderToFirestore(order);
+    // saveOrderToFirestore(order);
 
     // Save to Neon PostgreSQL
     fetch("/api/db/orders", {
@@ -480,7 +452,7 @@ class Store {
 
   createTicket(ticket: TicketDTO) {
     this.tickets.unshift(ticket);
-    saveTicketToFirestore(ticket);
+    // saveTicketToFirestore(ticket);
     eventBus.publish(EVENTS.TICKET_CREATED, ticket);
   }
 }

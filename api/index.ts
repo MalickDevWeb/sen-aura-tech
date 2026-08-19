@@ -3,6 +3,80 @@ import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { neonDbService } from "../src/db/neon-service";
 
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+const JWT_EXPIRY = "7d";
+
+function signJwt(payload: Record<string, any>) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const body = { ...payload, iat: now, exp: now + 7 * 24 * 60 * 60 };
+
+  const headerB64 = Buffer.from(JSON.stringify(header)).toString("base64url");
+  const bodyB64 = Buffer.from(JSON.stringify(body)).toString("base64url");
+  const signature = crypto.createHmac("sha256", JWT_SECRET).update(`${headerB64}.${bodyB64}`).digest("base64url");
+
+  return `${headerB64}.${bodyB64}.${signature}`;
+}
+
+function verifyJwt(token: string) {
+  try {
+    const [headerB64, bodyB64, signature] = token.split(".");
+    if (!headerB64 || !bodyB64 || !signature) return null;
+
+    const expected = crypto.createHmac("sha256", JWT_SECRET).update(`${headerB64}.${bodyB64}`).digest("base64url");
+    if (signature !== expected) return null;
+
+    const payload = JSON.parse(Buffer.from(bodyB64, "base64url").toString());
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+async function hashPassword(password: string) {
+  return new Promise<string>((resolve, reject) => {
+    crypto.scrypt(password, "senaura-salt", 64, { N: 1024 }, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(derivedKey.toString("hex"));
+    });
+  });
+}
+
+async function verifyPassword(password: string, hash: string) {
+  return hashPassword(password).then((h) => h === hash);
+}
+
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+  if (!token) {
+    return res.status(401).json({ success: false, error: "Token d'accès manquant." });
+  }
+
+  const payload = verifyJwt(token);
+  if (!payload) {
+    return res.status(401).json({ success: false, error: "Token invalide ou expiré." });
+  }
+
+  (req as any).user = payload;
+  next();
+}
+
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const user = (req as any).user;
+  if (!user || user.role !== "ADMIN") {
+    return res.status(403).json({ success: false, error: "Accès refusé. Rôle administrateur requis." });
+  }
+  next();
+}
+
+function withAdminAuth(handler: express.RequestHandler): express.RequestHandler[] {
+  return [requireAuth, requireAdmin, handler];
+}
+
 const app = express();
 
 // Increase payload limits for base64 file uploads (Cloudinary, PDF, Images)
@@ -531,20 +605,27 @@ app.post("/api/upload", async (req, res) => {
       (filename && (filename.endsWith(".mp4") || filename.endsWith(".mov") || filename.endsWith(".webm") || filename.endsWith(".avi")));
 
     const detectedResourceType = isVideo ? "video" : (resourceType === "raw" ? "raw" : "image");
-    let cloudName = process.env.CLOUDINARY_CLOUD_NAME || "t7lndpvi";
-    let apiKey = process.env.CLOUDINARY_API_KEY || "119922593911554";
-    let apiSecret = process.env.CLOUDINARY_API_SECRET || "oJ3WTzNg8_bhk83EYSNMmu1dgxY";
-    let uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || "senauratech_preset";
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    let uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
 
     // Auto-parse CLOUDINARY_URL if provided
     if (process.env.CLOUDINARY_URL) {
       try {
         const rawUrl = process.env.CLOUDINARY_URL.replace("cloudinary://", "http://");
         const parsed = new URL(rawUrl);
-        if (parsed.username) apiKey = parsed.username;
-        if (parsed.password) apiSecret = parsed.password;
-        if (parsed.hostname) cloudName = parsed.hostname;
+        if (parsed.username) (apiKey as any) = parsed.username;
+        if (parsed.password) (apiSecret as any) = parsed.password;
+        if (parsed.hostname) (cloudName as any) = parsed.hostname;
       } catch {}
+    }
+
+    if (!cloudName || !uploadPreset) {
+      return res.status(500).json({
+        success: false,
+        error: "Configuration Cloudinary manquante. Vérifiez les variables d'environnement CLOUDINARY_CLOUD_NAME et CLOUDINARY_UPLOAD_PRESET.",
+      });
     }
 
     // Check if live Cloudinary keys/preset exist in environment
@@ -651,15 +732,15 @@ app.post("/api/cloudinary/upload", (req, res) => {
 
 // Cloudinary Configuration Check
 app.get("/api/upload/config", (_req, res) => {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "t7lndpvi";
-  const apiKey = process.env.CLOUDINARY_API_KEY || "119922593911554";
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
 
   res.json({
-    configured: true,
-    cloudName,
-    apiKey,
+    configured: !!(cloudName && uploadPreset),
+    cloudName: cloudName || "t7lndpvi",
     provider: "cloudinary",
+  });
+});
     status: "Actif & Connecté",
   });
 });
@@ -1319,48 +1400,63 @@ app.post("/api/partners/apply", async (req, res) => {
 
 // 12. Authentication Endpoints
 app.post("/api/auth/login", async (req, res) => {
-  const { email, password, role = "CLIENT" } = req.body;
-  
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, error: "Email et mot de passe requis." });
+  }
+
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const dbUser = await neonDbService.getUserByEmail(email);
     if (dbUser) {
+      const storedHash = (dbUser as any).passwordHash as string | undefined;
+      if (!storedHash) {
+        return res.status(401).json({ success: false, error: "Mot de passe non configuré pour ce compte." });
+      }
+
+      const valid = await verifyPassword(password, storedHash);
+      if (!valid) {
+        return res.status(401).json({ success: false, error: "Email ou mot de passe incorrect." });
+      }
+
+      const token = signJwt({ sub: dbUser.id, email: dbUser.email, role: dbUser.role || "CLIENT" });
+
       return res.json({
         success: true,
-        user: { ...dbUser, role: dbUser.role || role },
-        token: `SAT_JWT_${dbUser.id}`,
+        user: { ...dbUser, role: dbUser.role || "CLIENT" },
+        token,
       });
     }
   } catch (e) {
-    console.warn("Neon DB login fallback:", e);
+    console.warn("Neon DB login error:", e);
   }
 
-  res.json({
-    success: true,
-    user: {
-      id: `USR-${Math.floor(10000 + Math.random() * 90000)}`,
-      email: email || "utilisateur@senauratech.sn",
-      fullName: email ? email.split("@")[0].toUpperCase() : "Utilisateur SEN AURA",
-      role,
-      city: "Dakar",
-      createdAt: new Date().toISOString(),
-    },
-    token: `SAT_JWT_TOKEN_${Date.now()}`,
-  });
+  res.status(401).json({ success: false, error: "Email ou mot de passe incorrect." });
 });
 
 app.post("/api/auth/register", async (req, res) => {
-  const { fullName, email, role = "CLIENT", phone, pin } = req.body;
+  const { fullName, email, role = "CLIENT", phone, pin, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, error: "Email et mot de passe requis." });
+  }
+
+  const id = crypto.randomUUID();
+  const passwordHash = await hashPassword(password);
+
   const newUser = {
-    id: req.body.id || `USR-${Math.floor(10000 + Math.random() * 90000)}`,
-    fullName: fullName || "Nouvel Utilisateur",
-    email: email || "utilisateur@senauratech.sn",
+    id,
+    fullName: fullName || email.split("@")[0].toUpperCase(),
+    email: email.toLowerCase().trim(),
     phone: phone || "+221 77 000 00 00",
     role,
     city: req.body.city || "Dakar",
     status: "ACTIF",
-    createdAt: req.body.createdAt || new Date().toISOString(),
+    passwordHash,
+    createdAt: new Date().toISOString(),
   };
+
   inMemoryData.users.unshift(newUser);
   inMemoryData.logs.unshift({
     id: `LOG-${Date.now()}`,
@@ -1376,11 +1472,13 @@ app.post("/api/auth/register", async (req, res) => {
     console.warn("Neon DB user save warning:", err);
   }
 
+  const token = signJwt({ sub: newUser.id, email: newUser.email, role: newUser.role });
+
   res.json({
     success: true,
     message: "Compte créé avec succès.",
     user: newUser,
-    token: `SAT_JWT_TOKEN_${Date.now()}`,
+    token,
   });
 });
 
@@ -2115,21 +2213,22 @@ app.get("/api/trainer/courses", async (_req, res) => {
 });
 
 app.post("/api/trainer/courses", async (req, res) => {
-  const { title, category = "IA & Tech", price = 150000, level = "Débutant", duration = "4 Semaines", description, videoUrl } = req.body;
+  const body = req.body;
   const newCourse = {
-    id: `CRS-${Math.floor(1000 + Math.random() * 9000)}`,
-    title: title || "Nouvelle Formation SEN AURA ACADEMY",
-    instructor: "Dr. Mamadou Ndiaye",
-    formateur: "Dr. Mamadou Ndiaye",
-    category,
-    price: Number(price),
+    id: body.id || `CRS-${Math.floor(1000 + Math.random() * 9000)}`,
+    title: body.title || "Nouvelle Formation SEN AURA ACADEMY",
+    instructor: body.instructor || body.instructorName || "Expert SEN AURA",
+    category: body.category || "IA & Tech",
+    price: Number(body.priceFCFA || body.price || 150000),
+    priceFCFA: Number(body.priceFCFA || body.price || 150000),
     studentsCount: 0,
-    level,
-    duration,
-    thumbnail: "https://res.cloudinary.com/senauratech/image/upload/v1720000000/sen_aura_tech/course_gemini_ai_masterclass.png",
-    description: description || "Module de formation pratique à Dakar",
-    videoUrl: videoUrl || "https://res.cloudinary.com/t7lndpvi/video/upload/v1/sample.mp4",
-    status: "Publié",
+    level: body.level || "Débutant",
+    duration: body.duration || "4 Semaines",
+    thumbnail: body.thumbnail || body.coverImage || body.mainMediaUrl || "https://res.cloudinary.com/senauratech/image/upload/v1720000000/sen_aura_tech/course_gemini_ai_masterclass.png",
+    description: body.description || "Module de formation pratique à Dakar",
+    videoUrl: body.videoUrl || body.mainMediaUrl || "",
+    status: body.status || "Publié",
+    instructorId: body.instructorId || body.vendorId || "",
     createdAt: new Date().toISOString(),
   };
 
@@ -2807,8 +2906,8 @@ app.get("/api/vendeur/analytics", handleGetVendorAnalytics);
 // ==========================================
 
 const handleProStats = async (_req: any, res: any) => {
-  const missions = inMemoryData.proMissions || [];
-  const profile = (inMemoryData as any).proProfile || {
+  let missions = inMemoryData.proMissions || [];
+  let profile = (inMemoryData as any).proProfile || {
     fullName: "Ousmane Diallo",
     phone: "+221 77 555 44 33",
     email: "ousmane.diallo@senauratech.sn",
@@ -2822,10 +2921,18 @@ const handleProStats = async (_req: any, res: any) => {
     skills: ["Énergie Solaire 3kVA/5kVA", "Onduleurs Hybrides", "Fibre Optique FTTH", "Vidéosurveillance CCTV 4K", "Domotique & Câblage"],
     badge: "Technicien Certifié SEN AURA TECH",
   };
+  let payouts = inMemoryData.proPayouts || [];
 
   try {
-    // Will hook up real DB queries here when sat_missions table is created
-    // const { neonDbService } = await import("../src/db/neon-service.ts");
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const [dbMissions, dbProfile, dbPayouts] = await Promise.all([
+      neonDbService.getRecords("pro_missions"),
+      neonDbService.getRecords("pro_profile"),
+      neonDbService.getRecords("pro_payouts"),
+    ]);
+    if (dbMissions.length > 0) missions = dbMissions;
+    if (dbProfile.length > 0) profile = dbProfile[0];
+    if (dbPayouts.length > 0) payouts = dbPayouts;
   } catch (e) {
     console.warn("Neon fallback for Pro stats", e);
   }
@@ -2837,7 +2944,7 @@ const handleProStats = async (_req: any, res: any) => {
   const completedBonusEarnings = completedMissions.reduce((sum: number, m: any) => sum + (m.rewardFCFA || 0), 0);
   const totalEarnedFCFA = completedBonusEarnings;
   const completedMissionsCount = completedMissions.length;
-  const paidOutFCFA = (inMemoryData.proPayouts || []).reduce((acc: number, p: any) => acc + (p.amountFCFA || 0), 0);
+  const paidOutFCFA = payouts.reduce((acc: number, p: any) => acc + (p.amountFCFA || 0), 0);
 
   res.json({
     success: true,
@@ -3851,22 +3958,21 @@ app.post("/api/auth/reset-password", (req, res) => {
   });
 });
 
-app.get("/api/auth/me", async (req, res) => {
-  const token = req.headers.authorization || "";
-  if (token.includes("SAT_JWT_") && !token.includes("SAT_JWT_TOKEN")) {
-    const userId = token.split("SAT_JWT_")[1];
-    try {
-      const { neonDbService } = await import("../src/db/neon-service.ts");
-      // Fallback implementation logic if getUserById is missing:
-      const users = await neonDbService.getAllUsers();
-      const user = users.find((u: any) => u.id === userId);
-      if (user) return res.json({ success: true, user });
-    } catch (e) {}
-  }
-  
+app.get("/api/auth/me", requireAuth, async (req, res) => {
+  const user = (req as any).user;
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const users = await neonDbService.getAllUsers();
+    const dbUser = users.find((u: any) => u.id === user.sub);
+    if (dbUser) {
+      const { passwordHash: _p, ...safeUser } = dbUser as any;
+      return res.json({ success: true, user: safeUser });
+    }
+  } catch (e) {}
+
   res.json({
     success: true,
-    user: inMemoryData.users[0],
+    user: inMemoryData.users.find((u) => u.id === user.sub) || null,
   });
 });
 
@@ -3957,29 +4063,37 @@ app.get("/api/ambassadors/applications", async (_req, res) => {
 });
 
 // 3. Update Application Status (Admin Approve / Reject / Complement)
-app.post("/api/ambassadors/applications/:id/status", (req, res) => {
+app.post("/api/ambassadors/applications/:id/status", async (req, res) => {
   const { id } = req.params;
-  const { status, tier = "GOLD", commissionRatePercent, ambassadorCode, feedbackNotes } = req.body; // "VALIDE" | "REFUSE" | "COMPLEMENT_DEMANDE" | "EN_ATTENTE"
-  
-  const appItem = (inMemoryData.ambassadorApplications || []).find(a => a.id === id);
+  const { status, tier = "GOLD", commissionRatePercent, ambassadorCode, feedbackNotes } = req.body;
+
+  let appItem = (inMemoryData.ambassadorApplications || []).find(a => a.id === id);
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const records = await neonDbService.getRecords("ambassador_applications");
+    const dbApp = records.find(a => a.id === id);
+    if (dbApp) appItem = { ...dbApp, ...appItem };
+  } catch (e) {}
+
   if (!appItem) {
     return res.status(404).json({ success: false, message: "Candidature introuvable." });
   }
 
-  (appItem as any).status = status;
-  if (tier) (appItem as any).tier = tier;
-  if (commissionRatePercent) (appItem as any).commissionRatePercent = Number(commissionRatePercent);
-  if (feedbackNotes !== undefined) (appItem as any).feedbackNotes = feedbackNotes;
-
+  const updates: any = { status };
+  if (tier) updates.tier = tier;
+  if (commissionRatePercent) updates.commissionRatePercent = Number(commissionRatePercent);
+  if (feedbackNotes !== undefined) updates.feedbackNotes = feedbackNotes;
   if (status === "VALIDE") {
-    if (ambassadorCode) {
-      (appItem as any).ambassadorCode = ambassadorCode;
-    } else if (!(appItem as any).ambassadorCode) {
-      const codeNum = Math.floor(10 + Math.random() * 90);
-      (appItem as any).ambassadorCode = `SAT-AMB-00${codeNum}`;
-    }
+    updates.ambassadorCode = ambassadorCode || appItem.ambassadorCode || `SAT-AMB-00${Math.floor(10 + Math.random() * 90)}`;
   }
 
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.saveRecord("ambassador_applications", id, { ...appItem, ...updates });
+  } catch (e) {}
+
+  Object.assign(appItem, updates);
   res.json({
     success: true,
     application: appItem,
@@ -3988,13 +4102,18 @@ app.post("/api/ambassadors/applications/:id/status", (req, res) => {
 });
 
 // 3b. Delete Application (Admin)
-app.delete("/api/ambassadors/applications/:id", (req, res) => {
+app.delete("/api/ambassadors/applications/:id", async (req, res) => {
   const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.deleteRecord(id);
+  } catch (e) {}
+
   const index = (inMemoryData.ambassadorApplications || []).findIndex(a => a.id === id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: "Candidature introuvable." });
+  if (index >= 0) {
+    inMemoryData.ambassadorApplications.splice(index, 1);
   }
-  inMemoryData.ambassadorApplications.splice(index, 1);
   res.json({ success: true, message: `Candidature #${id} supprimée avec succès.` });
 });
 
@@ -4062,41 +4181,63 @@ app.get("/api/ambassadors/prospects/:ambassadorId?", async (req, res) => {
 });
 
 // 5b. Update Prospect details
-app.put("/api/ambassadors/prospects/:prospectId", (req, res) => {
+app.put("/api/ambassadors/prospects/:prospectId", async (req, res) => {
   const { prospectId } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const updated = await neonDbService.updateRecord(prospectId, req.body);
+    if (updated) {
+      const idx = (inMemoryData.ambassadorProspects || []).findIndex(p => p.id === prospectId);
+      if (idx >= 0) inMemoryData.ambassadorProspects[idx] = { ...inMemoryData.ambassadorProspects[idx], ...updated };
+      return res.json({ success: true, prospect: updated, message: `Prospect ${prospectId} mis à jour avec succès.` });
+    }
+  } catch (e) {}
+
   const prospect = (inMemoryData.ambassadorProspects || []).find(p => p.id === prospectId);
   if (!prospect) {
     return res.status(404).json({ success: false, message: "Prospect introuvable." });
   }
-
   Object.assign(prospect, req.body);
   res.json({ success: true, prospect, message: `Prospect ${prospectId} mis à jour avec succès.` });
 });
 
 // 5c. Delete Prospect
-app.delete("/api/ambassadors/prospects/:prospectId", (req, res) => {
+app.delete("/api/ambassadors/prospects/:prospectId", async (req, res) => {
   const { prospectId } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.deleteRecord(prospectId);
+  } catch (e) {}
+
   const index = (inMemoryData.ambassadorProspects || []).findIndex(p => p.id === prospectId);
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: "Prospect introuvable." });
+  if (index >= 0) {
+    inMemoryData.ambassadorProspects.splice(index, 1);
   }
-  inMemoryData.ambassadorProspects.splice(index, 1);
   res.json({ success: true, message: `Prospect #${prospectId} supprimé avec succès.` });
 });
 
 // 6. Update Prospect Deal Stage (e.g. PROJET_SIGNE -> Generates Commission)
-app.put("/api/ambassadors/prospects/:prospectId/status", (req, res) => {
+app.put("/api/ambassadors/prospects/:prospectId/status", async (req, res) => {
   const { prospectId } = req.params;
   const { status, signedAmountFCFA, commissionRatePercent } = req.body;
 
-  const prospect = (inMemoryData.ambassadorProspects || []).find(p => p.id === prospectId);
+  let prospect = (inMemoryData.ambassadorProspects || []).find(p => p.id === prospectId);
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const records = await neonDbService.getRecords("ambassador_prospects");
+    const dbProspect = records.find(p => p.id === prospectId);
+    if (dbProspect) prospect = { ...dbProspect, ...prospect };
+  } catch (e) {}
+
   if (!prospect) {
     return res.status(404).json({ success: false, message: "Prospect introuvable." });
   }
 
-  prospect.status = status;
+  const updates: any = { status };
 
-  // Auto-generate commission if deal signed or paid
   if ((status === "PROJET_SIGNE" || status === "PAYE") && (signedAmountFCFA || prospect.estimatedBudgetFCFA)) {
     const amount = Number(signedAmountFCFA) || prospect.estimatedBudgetFCFA || 1000000;
     let rate = Number(commissionRatePercent) || 15;
@@ -4107,17 +4248,11 @@ app.put("/api/ambassadors/prospects/:prospectId/status", (req, res) => {
     }
 
     const commissionAmount = Math.round(amount * (rate / 100));
-    
-    // Check if commission already exists for this prospect
-    const existingComm = (inMemoryData.ambassadorCommissions || []).find(c => c.prospectId === prospect.id);
-    if (existingComm) {
-      existingComm.projectAmountFCFA = amount;
-      existingComm.commissionRatePercent = rate;
-      existingComm.commissionAmountFCFA = commissionAmount;
-      existingComm.status = status === "PAYE" ? "COMMISSION_VALIDEE" : "COMMISSION_VALIDEE";
-    } else {
+
+    try {
+      const { neonDbService } = await import("../src/db/neon-service.ts");
+      const commId = `COM-SAT-${Math.floor(100 + Math.random() * 900)}`;
       const newComm = {
-        id: `COM-SAT-${Math.floor(100 + Math.random() * 900)}`,
         ambassadorId: prospect.ambassadorId,
         ambassadorName: prospect.ambassadorName || "Ambassadeur SEN AURA",
         prospectId: prospect.id,
@@ -4129,10 +4264,16 @@ app.put("/api/ambassadors/prospects/:prospectId/status", (req, res) => {
         status: status === "PAYE" ? "COMMISSION_VALIDEE" : "COMMISSION_VALIDEE",
         createdAt: new Date().toISOString()
       };
-      (inMemoryData.ambassadorCommissions || []).unshift(newComm as any);
-    }
+      await neonDbService.saveRecord("ambassador_commissions", commId, newComm);
+    } catch (e) {}
   }
 
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.saveRecord("ambassador_prospects", prospectId, { ...prospect, ...updates });
+  } catch (e) {}
+
+  Object.assign(prospect, updates);
   res.json({
     success: true,
     prospect,
@@ -4141,19 +4282,27 @@ app.put("/api/ambassadors/prospects/:prospectId/status", (req, res) => {
 });
 
 // 7. Get Ambassador Commissions & Balance (All for Admin, or filtered by ambassador)
-app.get("/api/ambassadors/commissions/:ambassadorId?", (req, res) => {
+app.get("/api/ambassadors/commissions/:ambassadorId?", async (req, res) => {
   const { ambassadorId } = req.params;
-  const commissions = (ambassadorId && ambassadorId !== "all")
-    ? (inMemoryData.ambassadorCommissions || []).filter(c => c.ambassadorId === ambassadorId || c.ambassadorId === "SAT-AMB-0025")
-    : (inMemoryData.ambassadorCommissions || []);
-  
-  const totalEarnedFCFA = commissions.filter(c => c.status === "PAYE" || c.status === "COMMISSION_VALIDEE").reduce((sum, c) => sum + (c.commissionAmountFCFA || 0), 0);
-  const pendingFCFA = commissions.filter(c => c.status === "EN_ATTENTE_PAIEMENT_CLIENT").reduce((sum, c) => sum + (c.commissionAmountFCFA || 0), 0);
-  const paidFCFA = commissions.filter(c => c.status === "PAYE").reduce((sum, c) => sum + (c.commissionAmountFCFA || 0), 0);
+  let commissions = inMemoryData.ambassadorCommissions || [];
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const dbCommissions = await neonDbService.getRecords("ambassador_commissions");
+    if (dbCommissions.length > 0) commissions = dbCommissions;
+  } catch (e) {}
+
+  const filtered = (ambassadorId && ambassadorId !== "all")
+    ? commissions.filter((c: any) => c.ambassadorId === ambassadorId || c.ambassadorId === "SAT-AMB-0025")
+    : commissions;
+
+  const totalEarnedFCFA = filtered.filter(c => c.status === "PAYE" || c.status === "COMMISSION_VALIDEE").reduce((sum, c) => sum + (c.commissionAmountFCFA || 0), 0);
+  const pendingFCFA = filtered.filter(c => c.status === "EN_ATTENTE_PAIEMENT_CLIENT").reduce((sum, c) => sum + (c.commissionAmountFCFA || 0), 0);
+  const paidFCFA = filtered.filter(c => c.status === "PAYE").reduce((sum, c) => sum + (c.commissionAmountFCFA || 0), 0);
 
   res.json({
     success: true,
-    commissions,
+    commissions: filtered,
     summary: {
       totalEarnedFCFA,
       pendingFCFA,
@@ -4164,36 +4313,60 @@ app.get("/api/ambassadors/commissions/:ambassadorId?", (req, res) => {
 });
 
 // 7b. Update Commission Status (Admin)
-app.put("/api/ambassadors/commissions/:commId/status", (req, res) => {
+app.put("/api/ambassadors/commissions/:commId/status", async (req, res) => {
   const { commId } = req.params;
   const { status, paymentMethod, transactionRef } = req.body;
-  const comm = (inMemoryData.ambassadorCommissions || []).find(c => c.id === commId);
+
+  let comm = (inMemoryData.ambassadorCommissions || []).find(c => c.id === commId);
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const records = await neonDbService.getRecords("ambassador_commissions");
+    const dbComm = records.find(c => c.id === commId);
+    if (dbComm) comm = { ...dbComm, ...comm };
+  } catch (e) {}
+
   if (!comm) {
     return res.status(404).json({ success: false, message: "Commission introuvable." });
   }
-  comm.status = status;
+
+  const updates: any = { status };
   if (status === "PAYE") {
-    comm.paidAt = new Date().toISOString();
-    comm.paymentMethod = paymentMethod || "WAVE";
-    comm.transactionRef = transactionRef || `TX-SAT-${Date.now()}`;
+    updates.paidAt = new Date().toISOString();
+    updates.paymentMethod = paymentMethod || "WAVE";
+    updates.transactionRef = transactionRef || `TX-SAT-${Date.now()}`;
   }
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.saveRecord("ambassador_commissions", commId, { ...comm, ...updates });
+  } catch (e) {}
+
+  Object.assign(comm, updates);
   res.json({ success: true, commission: comm, message: `Commission #${commId} mise à jour avec statut: ${status}` });
 });
 
 // 8. Get All Payout Requests (Admin view)
-app.get("/api/ambassadors/payouts", (_req, res) => {
+app.get("/api/ambassadors/payouts", async (_req, res) => {
+  let payouts = inMemoryData.ambassadorPayouts || [];
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const dbPayouts = await neonDbService.getRecords("ambassador_payouts");
+    if (dbPayouts.length > 0) payouts = dbPayouts;
+  } catch (e) {}
+
   res.json({
     success: true,
-    payouts: inMemoryData.ambassadorPayouts || []
+    payouts,
   });
 });
 
 // 8b. Request Commission Payout (Ambassador)
-app.post("/api/ambassadors/payouts/request", (req, res) => {
+app.post("/api/ambassadors/payouts/request", async (req, res) => {
   const { ambassadorId = "SAT-AMB-0025", ambassadorName = "Mamadou Sow (Edu)", payoutMethod = "WAVE", payoutPhone = "+221 77 555 44 33", amountFCFA } = req.body;
 
+  const id = `PAY-SAT-${Math.floor(1000 + Math.random() * 9000)}`;
   const newPayout = {
-    id: `PAY-SAT-${Math.floor(1000 + Math.random() * 9000)}`,
     ambassadorId,
     ambassadorName,
     amountFCFA: Number(amountFCFA) || 125000,
@@ -4203,29 +4376,51 @@ app.post("/api/ambassadors/payouts/request", (req, res) => {
     requestedAt: new Date().toISOString(),
   };
 
-  (inMemoryData.ambassadorPayouts || []).unshift(newPayout as any);
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.saveRecord("ambassador_payouts", id, newPayout);
+  } catch (e) {}
 
+  const complete = { id, ...newPayout };
+  inMemoryData.ambassadorPayouts.unshift(complete as any);
   res.json({
     success: true,
-    payout: newPayout,
+    payout: complete,
     message: `Demande de retrait de ${newPayout.amountFCFA.toLocaleString("fr-FR")} FCFA enregistrée avec succès ! Virement sous 24h via ${payoutMethod} (${payoutPhone}).`
   });
 });
 
 // 8c. Process / Validate Payout (Admin Instant Wave/OM payout)
-app.post("/api/ambassadors/payouts/:payoutId/process", (req, res) => {
+app.post("/api/ambassadors/payouts/:payoutId/process", async (req, res) => {
   const { payoutId } = req.params;
   const { transactionRef, notes } = req.body;
-  const payout = (inMemoryData.ambassadorPayouts || []).find(p => p.id === payoutId);
+
+  let payout = (inMemoryData.ambassadorPayouts || []).find(p => p.id === payoutId);
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const records = await neonDbService.getRecords("ambassador_payouts");
+    const dbPayout = records.find(p => p.id === payoutId);
+    if (dbPayout) payout = { ...dbPayout, ...payout };
+  } catch (e) {}
+
   if (!payout) {
     return res.status(404).json({ success: false, message: "Demande de retrait introuvable." });
   }
 
-  (payout as any).status = "PAYE";
-  (payout as any).transactionRef = transactionRef || `WAVE-TX-${Math.floor(100000 + Math.random() * 900000)}`;
-  (payout as any).processedAt = new Date().toISOString();
-  if (notes) (payout as any).notes = notes;
+  const updates: any = {
+    status: "PAYE",
+    transactionRef: transactionRef || `WAVE-TX-${Math.floor(100000 + Math.random() * 900000)}`,
+    processedAt: new Date().toISOString(),
+  };
+  if (notes) updates.notes = notes;
 
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.saveRecord("ambassador_payouts", payoutId, { ...payout, ...updates });
+  } catch (e) {}
+
+  Object.assign(payout, updates);
   res.json({
     success: true,
     payout,
@@ -4234,11 +4429,25 @@ app.post("/api/ambassadors/payouts/:payoutId/process", (req, res) => {
 });
 
 // 9. Ambassador Global Statistics (Admin)
-app.get("/api/ambassadors/stats", (_req, res) => {
-  const apps = inMemoryData.ambassadorApplications || [];
-  const prospects = inMemoryData.ambassadorProspects || [];
-  const comms = inMemoryData.ambassadorCommissions || [];
-  const payouts = inMemoryData.ambassadorPayouts || [];
+app.get("/api/ambassadors/stats", async (_req, res) => {
+  let apps = inMemoryData.ambassadorApplications || [];
+  let prospects = inMemoryData.ambassadorProspects || [];
+  let comms = inMemoryData.ambassadorCommissions || [];
+  let payouts = inMemoryData.ambassadorPayouts || [];
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const [dbApps, dbProspects, dbComms, dbPayouts] = await Promise.all([
+      neonDbService.getRecords("ambassador_applications"),
+      neonDbService.getRecords("ambassador_prospects"),
+      neonDbService.getRecords("ambassador_commissions"),
+      neonDbService.getRecords("ambassador_payouts"),
+    ]);
+    if (dbApps.length > 0) apps = dbApps;
+    if (dbProspects.length > 0) prospects = dbProspects;
+    if (dbComms.length > 0) comms = dbComms;
+    if (dbPayouts.length > 0) payouts = dbPayouts;
+  } catch (e) {}
 
   const validatedAmbassadors = apps.filter(a => a.status === "VALIDE").length;
   const pendingApps = apps.filter(a => a.status === "EN_ATTENTE").length;
@@ -4275,6 +4484,301 @@ app.get("/api/ambassadors/leaderboard", (_req, res) => {
       { rank: 5, code: "SAT-AMB-0031", name: "Khadija Diallo", city: "Ziguinchor", projectsCount: 2, commissionsEarnedFCFA: 240000, badge: "⭐ Challenger", tier: "SILVER" }
     ]
   });
+});
+
+// ==========================================
+// 20. INITIATIVE FLAGSHIP & PROGRAMS
+// ==========================================
+
+// Programs
+app.get("/api/programs", async (_req, res) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const programs = await neonDbService.getAllPrograms();
+    res.json({ success: true, programs });
+  } catch (err: any) {
+    console.warn("[programs GET] NeonDB fallback:", err.message);
+    res.json({ success: true, programs: [] });
+  }
+});
+
+app.post("/api/programs", async (req, res) => {
+  const id = `PRG-${Date.now()}`;
+  const program = {
+    id,
+    ...req.body,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const saved = await neonDbService.saveProgram(program);
+    if (saved) {
+      return res.json({ success: true, message: "Programme créé avec succès", program: saved });
+    }
+  } catch (err: any) {
+    console.warn("[programs POST] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de créer le programme" });
+});
+
+app.put("/api/programs/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const existing = await neonDbService.getAllPrograms();
+    const program = existing.find(p => p.id === id);
+    if (!program) {
+      return res.status(404).json({ success: false, error: "Programme introuvable" });
+    }
+
+    const updated = await neonDbService.saveProgram({ ...program, ...req.body, updatedAt: new Date().toISOString() });
+    if (updated) {
+      return res.json({ success: true, message: "Programme mis à jour avec succès", program: updated });
+    }
+  } catch (err: any) {
+    console.warn("[programs PUT] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de mettre à jour le programme" });
+});
+
+app.delete("/api/programs/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const deleted = await neonDbService.deleteProgram(id);
+    if (deleted) {
+      return res.json({ success: true, message: "Programme supprimé avec succès" });
+    }
+  } catch (err: any) {
+    console.warn("[programs DELETE] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de supprimer le programme" });
+});
+
+// Solutions
+app.get("/api/solutions", async (_req, res) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const solutions = await neonDbService.getAllSolutions();
+    res.json({ success: true, solutions });
+  } catch (err: any) {
+    console.warn("[solutions GET] NeonDB fallback:", err.message);
+    res.json({ success: true, solutions: [] });
+  }
+});
+
+app.post("/api/solutions", async (req, res) => {
+  const id = `SOL-${Date.now()}`;
+  const solution = {
+    id,
+    ...req.body,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const saved = await neonDbService.saveSolution(solution);
+    if (saved) {
+      return res.json({ success: true, message: "Solution créée avec succès", solution: saved });
+    }
+  } catch (err: any) {
+    console.warn("[solutions POST] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de créer la solution" });
+});
+
+app.put("/api/solutions/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const existing = await neonDbService.getAllSolutions();
+    const solution = existing.find(s => s.id === id);
+    if (!solution) {
+      return res.status(404).json({ success: false, error: "Solution introuvable" });
+    }
+
+    const updated = await neonDbService.saveSolution({ ...solution, ...req.body, updatedAt: new Date().toISOString() });
+    if (updated) {
+      return res.json({ success: true, message: "Solution mise à jour avec succès", solution: updated });
+    }
+  } catch (err: any) {
+    console.warn("[solutions PUT] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de mettre à jour la solution" });
+});
+
+app.delete("/api/solutions/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const deleted = await neonDbService.deleteSolution(id);
+    if (deleted) {
+      return res.json({ success: true, message: "Solution supprimée avec succès" });
+    }
+  } catch (err: any) {
+    console.warn("[solutions DELETE] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de supprimer la solution" });
+});
+
+// Challenges
+app.get("/api/challenges", async (_req, res) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const challenges = await neonDbService.getAllChallenges();
+    res.json({ success: true, challenges });
+  } catch (err: any) {
+    console.warn("[challenges GET] NeonDB fallback:", err.message);
+    res.json({ success: true, challenges: [] });
+  }
+});
+
+app.post("/api/challenges", async (req, res) => {
+  const id = `CHL-${Date.now()}`;
+  const challenge = {
+    id,
+    ...req.body,
+    status: req.body.status || "EN_ATTENTE",
+    isPublished: req.body.isPublished || false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const saved = await neonDbService.saveChallenge(challenge);
+    if (saved) {
+      return res.json({ success: true, message: "Défi soumis avec succès", challenge: saved });
+    }
+  } catch (err: any) {
+    console.warn("[challenges POST] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de soumettre le défi" });
+});
+
+app.put("/api/challenges/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const existing = await neonDbService.getAllChallenges();
+    const challenge = existing.find(c => c.id === id);
+    if (!challenge) {
+      return res.status(404).json({ success: false, error: "Défi introuvable" });
+    }
+
+    const updated = await neonDbService.saveChallenge({ ...challenge, ...req.body, updatedAt: new Date().toISOString() });
+    if (updated) {
+      return res.json({ success: true, message: "Défi mis à jour avec succès", challenge: updated });
+    }
+  } catch (err: any) {
+    console.warn("[challenges PUT] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de mettre à jour le défi" });
+});
+
+app.delete("/api/challenges/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const deleted = await neonDbService.deleteChallenge(id);
+    if (deleted) {
+      return res.json({ success: true, message: "Défi supprimé avec succès" });
+    }
+  } catch (err: any) {
+    console.warn("[challenges DELETE] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de supprimer le défi" });
+});
+
+// Publications / Ads
+app.get("/api/publications", async (_req, res) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const publications = await neonDbService.getAllPublications();
+    res.json({ success: true, publications });
+  } catch (err: any) {
+    console.warn("[publications GET] NeonDB fallback:", err.message);
+    res.json({ success: true, publications: [] });
+  }
+});
+
+app.post("/api/publications", async (req, res) => {
+  const id = `PUB-${Date.now()}`;
+  const publication = {
+    id,
+    ...req.body,
+    publishedAt: req.body.publishedAt || new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const saved = await neonDbService.savePublication(publication);
+    if (saved) {
+      return res.json({ success: true, message: "Publication créée avec succès", publication: saved });
+    }
+  } catch (err: any) {
+    console.warn("[publications POST] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de créer la publication" });
+});
+
+app.put("/api/publications/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const existing = await neonDbService.getAllPublications();
+    const publication = existing.find(p => p.id === id);
+    if (!publication) {
+      return res.status(404).json({ success: false, error: "Publication introuvable" });
+    }
+
+    const updated = await neonDbService.savePublication({ ...publication, ...req.body, updatedAt: new Date().toISOString() });
+    if (updated) {
+      return res.json({ success: true, message: "Publication mise à jour avec succès", publication: updated });
+    }
+  } catch (err: any) {
+    console.warn("[publications PUT] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de mettre à jour la publication" });
+});
+
+app.delete("/api/publications/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const deleted = await neonDbService.deletePublication(id);
+    if (deleted) {
+      return res.json({ success: true, message: "Publication supprimée avec succès" });
+    }
+  } catch (err: any) {
+    console.warn("[publications DELETE] NeonDB error:", err.message);
+  }
+
+  res.status(500).json({ success: false, error: "Impossible de supprimer la publication" });
 });
 
 export default app;

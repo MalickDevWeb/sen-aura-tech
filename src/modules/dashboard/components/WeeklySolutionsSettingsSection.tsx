@@ -30,6 +30,7 @@ import {
   SystemConfig,
   ShowcaseProgramItem
 } from "../../../config/system-config";
+import { ActionConfirmModal, ConfirmConfig } from "../../../shared/components/ActionConfirmModal";
 
 interface WeeklySolutionsSettingsSectionProps {
   config: SystemConfig;
@@ -82,6 +83,7 @@ export const WeeklySolutionsSettingsSection: React.FC<WeeklySolutionsSettingsSec
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [techInput, setTechInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [confirmConfig, setConfirmConfig] = useState<ConfirmConfig | null>(null);
 
   const [form, setForm] = useState<ShowcaseProgramItem>({
     id: `prog-${Date.now()}`,
@@ -181,14 +183,21 @@ export const WeeklySolutionsSettingsSection: React.FC<WeeklySolutionsSettingsSec
 
   // Delete Program
   const handleDeleteProgram = (index: number) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce programme/solution ?")) return;
-    updateWeeklySolutions((prev) => {
-      const items = [...(prev.items || [])];
-      items.splice(index, 1);
-      return {
-        ...prev,
-        items,
-      };
+    setConfirmConfig({
+      title: "Suppression de Programme",
+      message: "Êtes-vous sûr de vouloir supprimer ce programme/solution ?",
+      type: "danger",
+      confirmText: "Supprimer",
+      onConfirm: () => {
+        updateWeeklySolutions((prev) => {
+          const items = [...(prev.items || [])];
+          items.splice(index, 1);
+          return {
+            ...prev,
+            items,
+          };
+        });
+      },
     });
   };
 
@@ -1014,6 +1023,8 @@ export const WeeklySolutionsSettingsSection: React.FC<WeeklySolutionsSettingsSec
         </div>
       )}
 
+      {/* Action Confirm Modal */}
+      <ActionConfirmModal config={confirmConfig} onClose={() => setConfirmConfig(null)} />
     </div>
   );
 };

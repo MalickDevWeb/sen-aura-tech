@@ -109,6 +109,14 @@ export default function App() {
     // Check URL parameters for direct deep-linking
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get("tab");
+    
+    // Admin Backdoor (Strict: /maintenance_sat)
+    if (window.location.pathname === "/maintenance_sat" || window.location.search.includes("maintenance_sat")) {
+      setIsAuthModalOpen(true);
+      // Clean up the URL to prevent re-triggering if they refresh
+      window.history.replaceState({}, "", "/");
+    }
+
     if (tabParam) {
       const normalizedTab = tabParam.toLowerCase().replace(/-/g, "_");
       if (
@@ -191,10 +199,18 @@ export default function App() {
   // --- MAINTENANCE MODE INTERCEPTOR ---
   if (config.security.maintenanceMode && (!store.isLoggedIn || store.currentUser.role !== "ADMIN")) {
     return (
-      <MaintenancePage
-        message={config.security.maintenanceMessage}
-        estimatedDate={config.security.estimatedReopenDate}
-      />
+      <>
+        <MaintenancePage
+          message={config.security.maintenanceMessage}
+          estimatedDate={config.security.estimatedReopenDate}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={handleAuthSuccess}
+          forceLoginOnly={true}
+        />
+      </>
     );
   }
 

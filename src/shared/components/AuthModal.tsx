@@ -23,7 +23,7 @@ import confetti from "canvas-confetti";
 import { store } from "../../database/store";
 import { UserRole } from "../contracts/types";
 import { BRAND_CONFIG } from "../../config/constants";
-import { AuthService } from "../../database/firebase";
+// import { AuthService } from "../../database/firebase";
 import { getWhatsAppLink, generateForgotPinRequestWhatsAppMsg } from "../utils/whatsappHelper";
 import { SecurityPinService } from "../../services/securityPinService";
 import {
@@ -41,9 +41,10 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  forceLoginOnly?: boolean;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess, forceLoginOnly = false }) => {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -172,10 +173,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           return;
         }
 
-        // Firebase sync
-        const formattedEmail = cleanEmail || `${cleanPhone}@senauratech.sn`;
-        const defaultPassword = `PIN-${pin}-${cleanPhone}`;
-        AuthService.signUp(formattedEmail, defaultPassword, cleanName, phone, selectedRole, region).catch(() => null);
+        // Firebase sync (REMOVED)
+        // const formattedEmail = cleanEmail || `${cleanPhone}@senauratech.sn`;
+        // const defaultPassword = `PIN-${pin}-${cleanPhone}`;
+        // AuthService.signUp(formattedEmail, defaultPassword, cleanName, phone, selectedRole, region).catch(() => null);
 
         confetti({
           particleCount: 100,
@@ -363,41 +364,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         )}
 
         {/* Mode Toggle Tabs */}
-        <div className="flex items-center p-1 rounded-2xl bg-slate-950 border border-slate-800 text-xs shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              setIsRegisterMode(false);
-              setError("");
-              setFieldErrors({});
-            }}
-            className={`flex-1 py-1.5 sm:py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              !isRegisterMode
-                ? "bg-amber-500 text-slate-950 shadow-md font-black"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Se Connecter</span>
-          </button>
+        {!forceLoginOnly && (
+          <div className="flex items-center p-1 rounded-2xl bg-slate-950 border border-slate-800 text-xs shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegisterMode(false);
+                setError("");
+                setFieldErrors({});
+              }}
+              className={`flex-1 py-1.5 sm:py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                !isRegisterMode
+                  ? "bg-amber-500 text-slate-950 shadow-md font-black"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Se Connecter</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setIsRegisterMode(true);
-              setError("");
-              setFieldErrors({});
-            }}
-            className={`flex-1 py-1.5 sm:py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              isRegisterMode
-                ? "bg-amber-500 text-slate-950 shadow-md font-black"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Nouveau Compte</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegisterMode(true);
+                setError("");
+                setFieldErrors({});
+              }}
+              className={`flex-1 py-1.5 sm:py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                isRegisterMode
+                  ? "bg-amber-500 text-slate-950 shadow-md font-black"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Nouveau Compte</span>
+            </button>
+          </div>
+        )}
 
         {/* Global Error Banner */}
         {error && (
@@ -408,7 +411,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         )}
 
         {/* Main Form without inner scrollbars */}
-        <form onSubmit={handleSubmit} noValidate className="space-y-2.5">
+        <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-2.5">
           
           {isRegisterMode ? (
             /* DUAL SECTION LAYOUT POUR LA CRÉATION DE COMPTE (NON-SCROLLABLE) */
@@ -466,6 +469,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     <input
                       type="tel"
                       inputMode="numeric"
+                      autoComplete="new-password"
                       value={phone}
                       onChange={(e) => {
                         const rawDigits = sanitizeSenegalPhoneInput(e.target.value);
@@ -541,6 +545,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                       <input
                         type={showPin ? "text" : "password"}
                         inputMode="numeric"
+                        autoComplete="new-password"
                         maxLength={4}
                         value={pin}
                         onChange={(e) => {
@@ -690,6 +695,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                   <input
                     type="tel"
                     inputMode="numeric"
+                    autoComplete="new-password"
                     value={phone}
                     onChange={(e) => {
                       const rawDigits = sanitizeSenegalPhoneInput(e.target.value);
@@ -734,6 +740,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                   <input
                     type={showPin ? "text" : "password"}
                     inputMode="numeric"
+                    autoComplete="new-password"
                     maxLength={4}
                     value={pin}
                     onChange={(e) => {

@@ -1,14 +1,13 @@
 import { Pool, neon } from "@neondatabase/serverless";
 
 // Neon PostgreSQL Connection String
-export const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  "postgresql://neondb_owner:npg_PtTW4J6IKsAO@ep-super-dust-ayj4z0l4-pooler.c-5.us-east-2.aws.neon.tech/senauratech_db?sslmode=require&channel_binding=require";
+export const DATABASE_URL = process.env.DATABASE_URL as string;
 
-// Serverless SQL executor for single queries
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is required");
+}
+
 export const sql = neon(DATABASE_URL);
-
-// Pool instance for transactional / complex connections
 export const pool = new Pool({ connectionString: DATABASE_URL });
 
 let initPromise: Promise<void> | null = null;
@@ -310,6 +309,91 @@ export async function initializeDatabase(): Promise<void> {
           )
         `;
 
+        // 10b. Programs / Initiatives / Flagship
+        await sql`
+          CREATE TABLE IF NOT EXISTS sat_programs (
+            id VARCHAR(100) PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) UNIQUE,
+            description TEXT,
+            category VARCHAR(100),
+            status VARCHAR(50) DEFAULT 'ACTIF',
+            is_flagship BOOLEAN DEFAULT false,
+            is_draft BOOLEAN DEFAULT false,
+            sprint_duration_days INT DEFAULT 7,
+            start_date TIMESTAMP WITH TIME ZONE,
+            end_date TIMESTAMP WITH TIME ZONE,
+            metadata JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+
+        // 10c. Solutions delivered by programs
+        await sql`
+          CREATE TABLE IF NOT EXISTS sat_solutions (
+            id VARCHAR(100) PRIMARY KEY,
+            program_id VARCHAR(100),
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) UNIQUE,
+            description TEXT,
+            category VARCHAR(100),
+            status VARCHAR(50) DEFAULT 'LIVRE',
+            sprint_number INT,
+            impact_metric VARCHAR(255),
+            metrics JSONB,
+            stack_tech JSONB,
+            image_url TEXT,
+            demo_url TEXT,
+            is_published BOOLEAN DEFAULT true,
+            is_draft BOOLEAN DEFAULT false,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+
+        // 10d. Community challenges / ideas submitted
+        await sql`
+          CREATE TABLE IF NOT EXISTS sat_challenges (
+            id VARCHAR(100) PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            description TEXT,
+            submitted_by_name VARCHAR(255),
+            submitted_by_email VARCHAR(255),
+            submitted_by_phone VARCHAR(50),
+            sector VARCHAR(100),
+            city VARCHAR(100),
+            estimated_budget_fcfa NUMERIC DEFAULT 0,
+            status VARCHAR(50) DEFAULT 'EN_ATTENTE',
+            is_published BOOLEAN DEFAULT false,
+            metadata JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+
+        // 10e. Publications / ads for programs and solutions
+        await sql`
+          CREATE TABLE IF NOT EXISTS sat_publications (
+            id VARCHAR(100) PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            body TEXT,
+            type VARCHAR(50) DEFAULT 'SOLUTION',
+            program_id VARCHAR(100),
+            solution_id VARCHAR(100),
+            challenge_id VARCHAR(100),
+            media_url TEXT,
+            media_type VARCHAR(50),
+            call_to_action VARCHAR(255),
+            target_url VARCHAR(255),
+            is_active BOOLEAN DEFAULT true,
+            is_draft BOOLEAN DEFAULT false,
+            published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+
         // 10. Leadership & Dirigeants
         await sql`
           CREATE TABLE IF NOT EXISTS sat_leadership (
@@ -389,7 +473,21 @@ export async function initializeDatabase(): Promise<void> {
           `CREATE INDEX IF NOT EXISTS sat_providers_cat_idx ON sat_providers (category);`,
           // Tickets (User Phone, Status)
           `CREATE INDEX IF NOT EXISTS sat_tickets_phone_idx ON sat_tickets (user_phone);`,
-          `CREATE INDEX IF NOT EXISTS sat_tickets_status_idx ON sat_tickets (status);`
+          `CREATE INDEX IF NOT EXISTS sat_tickets_status_idx ON sat_tickets (status);`,
+          // Programs (Status, Flagship, Draft, Category)
+          `CREATE INDEX IF NOT EXISTS sat_programs_status_idx ON sat_programs (status);`,
+          `CREATE INDEX IF NOT EXISTS sat_programs_slug_idx ON sat_programs (slug);`,
+          `CREATE INDEX IF NOT EXISTS sat_programs_category_idx ON sat_programs (category);`,
+          // Solutions (Program, Status, Published, Sprint)
+          `CREATE INDEX IF NOT EXISTS sat_solutions_program_id_idx ON sat_solutions (program_id);`,
+          `CREATE INDEX IF NOT EXISTS sat_solutions_status_idx ON sat_solutions (status);`,
+          `CREATE INDEX IF NOT EXISTS sat_solutions_category_idx ON sat_solutions (category);`,
+          // Challenges (Status, Published, Sector)
+          `CREATE INDEX IF NOT EXISTS sat_challenges_status_idx ON sat_challenges (status);`,
+          `CREATE INDEX IF NOT EXISTS sat_challenges_sector_idx ON sat_challenges (sector);`,
+          // Publications (Type, Active, Draft, Program/Solution/Challenge)
+          `CREATE INDEX IF NOT EXISTS sat_publications_type_idx ON sat_publications (type);`,
+          `CREATE INDEX IF NOT EXISTS sat_publications_is_active_idx ON sat_publications (is_active);`
         ];
 
         for (const q of indexQueries) {

@@ -293,3 +293,76 @@ export interface TicketDTO {
   messages: { sender: string; text: string; timestamp: string }[];
   createdAt: string;
 }
+
+export interface ProgramDTO {
+  id: string;
+  title: string;
+  slug?: string;
+  description?: string;
+  category?: string;
+  status: "ACTIF" | "INACTIF" | "TERMINE" | "BROUILLON";
+  isFlagship?: boolean;
+  isDraft?: boolean;
+  sprintDurationDays?: number;
+  startDate?: string;
+  endDate?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SolutionDTO {
+  id: string;
+  programId?: string;
+  title: string;
+  slug?: string;
+  description?: string;
+  category?: string;
+  status: "LIVRE" | "EN_COURS" | "BROUILLON" | "EN_TEST";
+  sprintNumber?: number;
+  impactMetric?: string;
+  metrics?: Record<string, any>;
+  stackTech?: string[];
+  imageUrl?: string;
+  demoUrl?: string;
+  isPublished?: boolean;
+  isDraft?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ChallengeDTO {
+  id: string;
+  title: string;
+  description?: string;
+  submittedByName?: string;
+  submittedByEmail?: string;
+  submittedByPhone?: string;
+  sector?: string;
+  city?: string;
+  estimatedBudgetFCFA?: number;
+  status: "EN_ATTENTE" | "SELECTIONNE" | "REFUSE" | "EN_COURS";
+  isPublished?: boolean;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PublicationDTO {
+  id: string;
+  title: string;
+  body?: string;
+  type: "SOLUTION" | "PROGRAMME" | "CHALLENGE" | "PUB";
+  programId?: string;
+  solutionId?: string;
+  challengeId?: string;
+  mediaUrl?: string;
+  mediaType?: string;
+  callToAction?: string;
+  targetUrl?: string;
+  isActive?: boolean;
+  isDraft?: boolean;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}

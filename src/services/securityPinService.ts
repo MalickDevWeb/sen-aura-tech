@@ -1,5 +1,6 @@
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "../database/firebase";
+// Removed Firebase Firestore imports
+// import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+// import { db } from "../database/firebase";
 import { UserRole, ProAccountStatus } from "../shared/contracts/types";
 
 export interface UserAccountSecurity {
@@ -93,22 +94,8 @@ export class SecurityPinService {
       }
     } catch {}
 
-    // 2. Vérification dans Firestore (user_security_accounts)
-    try {
-      if (cleanPhone && (!excludeCleanPhone || cleanPhone !== excludeCleanPhone)) {
-        const docRef = doc(db, "user_security_accounts", cleanPhone);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          isPhoneTaken = true;
-          const data = snap.data() as UserAccountSecurity;
-          if (cleanEmail && data.email && data.email.trim().toLowerCase() === cleanEmail) {
-            isEmailTaken = true;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Firestore uniqueness check warning:", e);
-    }
+    // 2. Vérification dans Firestore (user_security_accounts) - REMOVED
+    // Try block removed to disconnect Firebase.
 
     // 3. Vérification via l'API Backend & Neon PostgreSQL
     try {
@@ -179,20 +166,8 @@ export class SecurityPinService {
       }
     } catch {}
 
-    // 2. Check Firestore
-    try {
-      const docRef = doc(db, "user_security_accounts", cleanPhone);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data() as UserAccountSecurity;
-        try {
-          localStorage.setItem(`sat_user_sec_${cleanPhone}`, JSON.stringify(data));
-        } catch {}
-        return { exists: true, account: data };
-      }
-    } catch (e) {
-      console.warn("Firestore check skipped:", e);
-    }
+    // 2. Check Firestore - REMOVED
+    // Try block removed to disconnect Firebase.
 
     return { exists: false };
   }
@@ -294,13 +269,8 @@ export class SecurityPinService {
       localStorage.setItem(`sat_user_sec_${cleanPhone}`, JSON.stringify(account));
     } catch {}
 
-    // Save in Firestore
-    try {
-      const docRef = doc(db, "user_security_accounts", cleanPhone);
-      await setDoc(docRef, account);
-    } catch (e) {
-      console.warn("Firestore save warning:", e);
-    }
+    // Save in Firestore - REMOVED
+    // Try block removed to disconnect Firebase.
 
     // Sync in Neon PostgreSQL Database
     try {
@@ -346,10 +316,7 @@ export class SecurityPinService {
       trialExpiresAt,
     };
 
-    try {
-      const docRef = doc(db, "user_security_accounts", cleanPhone);
-      await updateDoc(docRef, partialUpdate);
-    } catch {}
+    // Firestore Update - REMOVED
 
     let updatedAccount: UserAccountSecurity | undefined;
     try {
@@ -381,13 +348,7 @@ export class SecurityPinService {
       proApproved: isActive,
     };
 
-    // 1. Update Firestore
-    try {
-      const docRef = doc(db, "user_security_accounts", cleanPhone);
-      await updateDoc(docRef, partialUpdate);
-    } catch (e) {
-      console.warn("Firestore updateDoc warning:", e);
-    }
+    // 1. Update Firestore - REMOVED
 
     // 2. Update LocalStorage cache
     let updatedAccount: UserAccountSecurity | undefined;
@@ -503,13 +464,13 @@ export class SecurityPinService {
       return { success: false, error: "Veuillez entrer votre numéro de téléphone." };
     }
 
-    // Compte Super Admin par défaut (705334611 ou PIN master 4821)
-    if (cleanPhone === "705334611" && (pin === "4821" || pin === "1234" || pin === "7053")) {
+    // Compte Super Admin officiel
+    if (cleanPhone === "771719013" && pin === "1732") {
       const adminAccount: UserAccountSecurity = {
-        phone: "+221 705334611",
-        cleanPhone: "705334611",
+        phone: `+221 ${cleanPhone}`,
+        cleanPhone: cleanPhone,
         pinHash: await hashPin(pin),
-        fullName: "Papa Malick Teuw (Super Admin)",
+        fullName: "Administrateur SEN AURA",
         role: "ADMIN",
         region: "Dakar",
         createdAt: new Date().toISOString(),
@@ -542,7 +503,7 @@ export class SecurityPinService {
     }
 
     const providedHash = await hashPin(pin);
-    if (providedHash === account.pinHash || pin === "1234" || pin === "4821") {
+    if (providedHash === account.pinHash) {
       // Succès : réinitialiser les échecs
       account.failedAttempts = 0;
       account.lockedUntil = null;
@@ -550,12 +511,7 @@ export class SecurityPinService {
 
       try {
         localStorage.setItem(`sat_user_sec_${cleanPhone}`, JSON.stringify(account));
-        const docRef = doc(db, "user_security_accounts", cleanPhone);
-        updateDoc(docRef, {
-          failedAttempts: 0,
-          lockedUntil: null,
-          lastLoginAt: account.lastLoginAt,
-        }).catch(() => null);
+        // Firestore update removed
       } catch {}
 
       return { success: true, account };
@@ -597,8 +553,7 @@ export class SecurityPinService {
       if (account) {
         account.pinHash = newHash;
         localStorage.setItem(`sat_user_sec_${cleanPhone}`, JSON.stringify(account));
-        const docRef = doc(db, "user_security_accounts", cleanPhone);
-        await updateDoc(docRef, { pinHash: newHash });
+        // Firestore update removed
       }
       return { success: true };
     } catch (e) {
@@ -674,13 +629,7 @@ export class SecurityPinService {
       localStorage.setItem(`sat_user_sec_${cleanPhone}`, JSON.stringify(updatedAccount));
     } catch {}
 
-    // Sauvegarde Firestore
-    try {
-      const docRef = doc(db, "user_security_accounts", cleanPhone);
-      await setDoc(docRef, updatedAccount, { merge: true });
-    } catch (e) {
-      console.warn("Firestore adminResetPin sync warning:", e);
-    }
+    // Sauvegarde Firestore - REMOVED
 
     return {
       success: true,
