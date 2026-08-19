@@ -100,7 +100,11 @@ export function UserPinLoginForm({ onSuccess, onError }: UserPinLoginFormProps) 
             setIsRegisterMode(true);
             onError("Première visite ? Définissez votre Code PIN secret personnel ci-dessous pour sécuriser votre compte.");
           } else {
-            onError(authResult.error || 'Code PIN secret incorrect.');
+            const pinError = authResult.error?.toLowerCase().includes('pin') || authResult.error?.toLowerCase().includes('code')
+              ? 'Ce numéro est déjà enregistré. Le code PIN saisi est incorrect.'
+              : authResult.error;
+            setFieldErrors({ pin: pinError || 'Code PIN secret incorrect.' });
+            onError(pinError || 'Code PIN secret incorrect.');
           }
         }
       } catch (err: any) {

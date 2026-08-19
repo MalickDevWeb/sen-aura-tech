@@ -270,7 +270,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             setIsRegisterMode(true);
             setError("Numéro non enregistré. Veuillez définir votre Code PIN personnel pour créer votre compte.");
           } else {
-            setError(authRes.error || "Code PIN incorrect.");
+            const pinError = authRes.error?.toLowerCase().includes("pin") || authRes.error?.toLowerCase().includes("code")
+              ? "Ce numéro est déjà enregistré. Le code PIN saisi est incorrect."
+              : authRes.error;
+            setFieldErrors({ pin: pinError || "Code PIN incorrect." });
+            setError(pinError || "Code PIN incorrect.");
           }
           setIsSubmitting(false);
           return;
