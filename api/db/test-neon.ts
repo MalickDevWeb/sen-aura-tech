@@ -5,26 +5,21 @@ async function testNeonHandler(req: any, res: any) {
   }
 
   try {
-    // Test 1: Import sql
-    console.log("[TEST] Importing sql from neon...");
-    const { sql } = await import("../../src/db/neon");
-    console.log("[TEST] sql imported:", typeof sql);
+    // Test 1: Import neonDbService
+    console.log("[TEST] Importing neonDbService...");
+    const { neonDbService } = await import("../../src/db/neon-service");
+    console.log("[TEST] neonDbService imported:", typeof neonDbService);
 
-    // Test 2: Simple query
-    console.log("[TEST] Running SELECT 1...");
-    const result = await sql`SELECT 1 as test`;
-    console.log("[TEST] SELECT 1 result:", result);
-
-    // Test 3: Count users
-    console.log("[TEST] Counting sat_users...");
-    const countResult = await sql`SELECT COUNT(*) as cnt FROM sat_users`;
-    console.log("[TEST] Count result:", countResult);
+    // Test 2: Get all users
+    console.log("[TEST] Getting all users...");
+    const allUsers = await neonDbService.getAllUsers();
+    console.log("[TEST] Users count:", allUsers?.length);
+    console.log("[TEST] First user:", allUsers?.[0]);
 
     return res.json({
       success: true,
-      test1: "sql imported",
-      test2: result,
-      test3: countResult,
+      userCount: allUsers?.length || 0,
+      firstUser: allUsers?.[0] || null,
     });
   } catch (err: any) {
     console.error("[TEST_NEON_ERROR]", err?.message || err, err?.stack);
