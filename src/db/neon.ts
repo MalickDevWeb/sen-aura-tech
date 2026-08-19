@@ -1,14 +1,21 @@
 import { Pool, neon } from "@neondatabase/serverless";
 
 // Neon PostgreSQL Connection String
-export const DATABASE_URL = process.env.DATABASE_URL as string;
+export const DATABASE_URL = process.env.DATABASE_URL || "";
 
-if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is required");
+function missingDatabaseUrlError() {
+  return new Error("DATABASE_URL environment variable is required");
 }
 
-export const sql = neon(DATABASE_URL);
-export const pool = new Pool({ connectionString: DATABASE_URL });
+export const sql = DATABASE_URL
+  ? neon(DATABASE_URL)
+  : (async () => {
+      throw missingDatabaseUrlError();
+    }) as ReturnType<typeof neon>;
+
+export const pool = DATABASE_URL
+  ? new Pool({ connectionString: DATABASE_URL })
+  : null;
 
 let initPromise: Promise<void> | null = null;
 
@@ -16,6 +23,10 @@ let initPromise: Promise<void> | null = null;
  * Helper to ensure all necessary Neon PostgreSQL tables exist before queries
  */
 export async function initializeDatabase(): Promise<void> {
+  if (!DATABASE_URL) {
+    throw missingDatabaseUrlError();
+  }
+
   if (!initPromise) {
     initPromise = (async () => {
       try {

@@ -718,7 +718,13 @@ app.post("/api/auth/verify-pin", async (req, res) => {
     res.json({ success: true, account });
   } catch (err: any) {
     console.error("verify-pin error:", err);
-    res.status(500).json({ success: false, error: "Erreur serveur lors de la vérification du PIN." });
+    const isMissingDatabaseUrl = err?.message?.includes("DATABASE_URL");
+    res.status(isMissingDatabaseUrl ? 503 : 500).json({
+      success: false,
+      error: isMissingDatabaseUrl
+        ? "Connexion impossible : la base de données n'est pas configurée sur le serveur."
+        : "Erreur serveur lors de la vérification du PIN.",
+    });
   }
 });
 
@@ -852,7 +858,8 @@ app.get("/api/db/courses", async (_req, res) => {
     const courses = await neonDbService.getAllCourses();
     res.json({ success: true, courses });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: "Erreur interne du serveur", courses: [] });
+    console.warn("Neon getAllCourses fallback:", err);
+    res.json({ success: true, courses: inMemoryData.courses });
   }
 });
 
@@ -907,7 +914,8 @@ app.get("/api/db/providers", async (_req, res) => {
     const providers = await neonDbService.getAllProviders();
     res.json({ success: true, providers });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: "Erreur interne du serveur", providers: [] });
+    console.warn("Neon getAllProviders fallback:", err);
+    res.json({ success: true, providers: inMemoryData.providers });
   }
 });
 
@@ -1904,7 +1912,13 @@ app.post("/api/auth/verify-pin", async (req, res) => {
     }
   } catch (e) {
     console.warn("Neon DB verify-pin error:", e);
-    return res.status(500).json({ success: false, error: "Erreur interne de sécurité." });
+    const isMissingDatabaseUrl = (e as any)?.message?.includes("DATABASE_URL");
+    return res.status(isMissingDatabaseUrl ? 503 : 500).json({
+      success: false,
+      error: isMissingDatabaseUrl
+        ? "Connexion impossible : la base de données n'est pas configurée sur le serveur."
+        : "Erreur interne de sécurité.",
+    });
   }
 });
 
