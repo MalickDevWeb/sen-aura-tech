@@ -109,11 +109,11 @@ async function verifyPinHandler(req: any, res: any) {
     });
   } catch (err: any) {
     console.error("[VERIFY_PIN_ERROR]", err?.message || err, err?.stack);
-    const isDev = process.env.NODE_ENV !== "production";
+    // Always return debug info for now
     return res.status(500).json({
       success: false,
-      error: isDev ? (err?.message || "Erreur serveur lors de la vérification du PIN.") : "Erreur serveur lors de la vérification du PIN.",
-      ...(isDev && { debug: err?.message }),
+      error: err?.message || "Erreur serveur lors de la vérification du PIN.",
+      fullError: String(err),
     });
   }
 }
