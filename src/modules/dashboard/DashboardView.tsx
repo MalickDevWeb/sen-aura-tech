@@ -389,7 +389,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
 
     const loadVendorProducts = () => {
-      authFetch("/api/vendor/products")
+      authFetch("/api/vendor-products")
         .then(r => r.json())
         .then(data => {
           if (data.success && Array.isArray(data.products) && data.products.length > 0) {

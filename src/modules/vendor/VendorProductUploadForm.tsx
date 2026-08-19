@@ -411,7 +411,7 @@ export const VendorProductUploadForm: React.FC<VendorProductUploadFormProps> = (
     };
 
     try {
-      const response = await authFetch("/api/vendor/products", {
+      const response = await authFetch("/api/vendor-products", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
