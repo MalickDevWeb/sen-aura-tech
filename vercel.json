@@ -43,14 +43,6 @@
       "maxDuration": 30,
       "memory": 1024
     },
-    "api/vendor/products.ts": {
-      "maxDuration": 30,
-      "memory": 1024
-    },
-    "api/vendor/[...path].ts": {
-      "maxDuration": 30,
-      "memory": 1024
-    },
     "api/vendor-products.ts": {
       "maxDuration": 30,
       "memory": 1024
