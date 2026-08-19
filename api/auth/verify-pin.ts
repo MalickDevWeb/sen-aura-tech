@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
+const { neon } = require("@neondatabase/serverless");
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+const DATABASE_URL = process.env.DATABASE_URL || "";
 
 function signJwt(payload: Record<string, unknown>) {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
@@ -8,6 +10,13 @@ function signJwt(payload: Record<string, unknown>) {
   const body = Buffer.from(JSON.stringify({ ...payload, iat: now, exp: now + 7 * 24 * 60 * 60 })).toString("base64url");
   const signature = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
   return `${header}.${body}.${signature}`;
+}
+
+function normalizePhone(phone: string = ""): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("00221") && digits.length > 9) return digits.slice(5).slice(-9);
+  if (digits.startsWith("221") && digits.length > 9) return digits.slice(3).slice(-9);
+  return digits.slice(-9);
 }
 
 async function readJson(req: any) {
@@ -39,11 +48,17 @@ async function verifyPinHandler(req: any, res: any) {
       return res.status(400).json({ success: false, error: "Téléphone et PIN requis." });
     }
 
-    const { neonDbService } = await import("../../src/db/neon-service");
-    const normalizedPhone = neonDbService.normalizePhone(phone);
+    if (!DATABASE_URL) {
+      return res.status(503).json({
+        success: false,
+        error: "Connexion impossible : la base de données n'est pas configurée sur le serveur.",
+      });
+    }
+
+    const sql = neon(DATABASE_URL);
+    const normalizedPhone = normalizePhone(phone);
     
     // Fetch all users and filter by phone pattern
-    const { sql } = await import("../../src/db/neon");
     const allUsers = await sql`SELECT id, full_name, email, phone, pin, role, region, data, created_at FROM sat_users LIMIT 100;`;
     
     const user = allUsers.find((u: any) => {
