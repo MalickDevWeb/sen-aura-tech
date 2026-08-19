@@ -489,6 +489,12 @@ export class SecurityPinService {
       const data = await response.json();
       
       if (data.success && data.account) {
+        if (data.token) {
+          try {
+            localStorage.setItem("senaura_auth_token", data.token);
+          } catch {}
+        }
+
         // Enregistrer/Mettre à jour le cache local avec le PIN hashé pour la persistance PWA
         const hashedPin = await hashPin(pin);
         const accountToCache: UserAccountSecurity = {

@@ -690,52 +690,6 @@ app.post("/api/auth/check-uniqueness", async (req, res) => {
   }
 });
 
-app.post("/api/auth/verify-pin", async (req, res) => {
-  try {
-    const { phone, pin } = req.body;
-    if (!phone || !pin) {
-      return res.status(400).json({ success: false, error: "Téléphone et PIN requis" });
-    }
-    
-    const user = await neonDbService.getUserByPhone(phone);
-
-    if (!user) {
-      return res.status(404).json({ success: false, error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN." });
-    }
-
-    if (user.pin !== pin) {
-      return res.status(401).json({ success: false, error: "Code PIN incorrect." });
-    }
-
-    const userData = (user.data && typeof user.data === "object") ? user.data : {};
-    
-    const account = {
-      id: user.id,
-      fullName: user.full_name || user.fullName,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      region: user.region || "Dakar",
-      createdAt: user.created_at || new Date().toISOString(),
-      proStatus: userData.proStatus || user.proStatus || undefined,
-      proApproved: userData.proApproved || user.proApproved || false,
-      trialExpiresAt: userData.trialExpiresAt || user.trialExpiresAt || undefined,
-      proFreeTrialActive: userData.proFreeTrialActive || user.proFreeTrialActive || false,
-    };
-
-    res.json({ success: true, account });
-  } catch (err: any) {
-    console.error("verify-pin error:", err);
-    const isMissingDatabaseUrl = err?.message?.includes("DATABASE_URL");
-    res.status(isMissingDatabaseUrl ? 503 : 500).json({
-      success: false,
-      error: isMissingDatabaseUrl
-        ? "Connexion impossible : la base de données n'est pas configurée sur le serveur."
-        : "Erreur serveur lors de la vérification du PIN.",
-    });
-  }
-});
-
 // Dual-mode: accepts JWT token (update) OR phone+PIN (first login)
 app.post("/api/db/users/sync", async (req, res) => {
   try {
@@ -1879,8 +1833,9 @@ app.post("/api/auth/verify-pin", async (req, res) => {
       return res.json({
         success: true,
         account: {
+          id: dbUser.id,
           phone: dbUser.phone,
-          cleanPhone: dbUser.phone.replace(/\\D/g, "").slice(-9),
+          cleanPhone: dbUser.phone.replace(/\D/g, "").slice(-9),
           email: dbUser.email,
           fullName: dbUser.full_name,
           role: dbUser.role || "CLIENT",
@@ -1889,7 +1844,13 @@ app.post("/api/auth/verify-pin", async (req, res) => {
           proApproved: dbUser.data?.proApproved,
           trialExpiresAt: dbUser.data?.trialExpiresAt,
           proFreeTrialActive: dbUser.data?.proFreeTrialActive,
-        }
+        },
+        token: signJwt({
+          sub: dbUser.id,
+          phone: dbUser.phone,
+          role: dbUser.role || "CLIENT",
+          email: dbUser.email,
+        }),
       });
     } else {
       // Échec: Incrémentation du compteur et potentiel blocage
