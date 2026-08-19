@@ -42,6 +42,18 @@ export async function hashPin(pin: string): Promise<string> {
   return `hash_${Math.abs(hash)}`;
 }
 
+async function readAuthJson(response: Response): Promise<any> {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  return {
+    success: false,
+    error: "Le service de connexion est momentanément indisponible. Veuillez réessayer dans quelques instants.",
+  };
+}
+
 export class SecurityPinService {
   private static sanitizePhone(phone: string): string {
     const clean = phone.replace(/\D/g, "");
@@ -108,7 +120,7 @@ export class SecurityPinService {
           email: cleanEmail,
         }),
       });
-      const data = await response.json();
+      const data = await readAuthJson(response);
       if (!data.available) {
         if (data.isPhoneTaken) isPhoneTaken = true;
         if (data.isEmailTaken) isEmailTaken = true;
@@ -512,7 +524,7 @@ export class SecurityPinService {
       if (backendWasReachable) {
         return {
           success: false,
-          error: err?.message || "Impossible de vérifier ce compte pour le moment. Réessayez dans quelques instants.",
+          error: "Le service de connexion est momentanément indisponible. Veuillez réessayer dans quelques instants.",
         };
       }
       console.warn("Backend auth failed, falling back to local storage...", err?.message);
