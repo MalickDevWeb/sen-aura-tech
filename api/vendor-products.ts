@@ -1,5 +1,25 @@
 import crypto from "node:crypto";
-import { getSql, handleOptions, requireJwt } from "./_route-utils";
+
+function setCors(res: any) {
+	res.setHeader("Access-Control-Allow-Origin", "*");
+	res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+	res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
+function isAuthorized(req: any, res: any) {
+	const token = String(req.headers?.authorization || "").replace(/^Bearer\s+/i, "").trim();
+	if (!token) return res.status(401).json({ success: false, error: "Token d'accès manquant." });
+	try {
+		const [header, body, signature] = token.split(".");
+		const secret = process.env.JWT_SECRET || "dev-secret-change-in-production";
+		const expected = crypto.createHmac("sha256", secret).update(`${header}.${body}`).digest("base64url");
+		const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+		if (!header || !body || signature !== expected || (payload.exp && Date.now() / 1000 > payload.exp)) throw new Error("invalid token");
+		return true;
+	} catch {
+		return res.status(401).json({ success: false, error: "Token invalide ou expiré." });
+	}
+}
 
 function mapProduct(row: any) {
 	return {
@@ -23,11 +43,15 @@ function mapProduct(row: any) {
 }
 
 export default async function handler(req: any, res: any) {
-	if (handleOptions(req, res)) return;
-	if (!requireJwt(req, res)) return;
+	setCors(res);
+	if (req.method === "OPTIONS") return res.status(204).end();
+	if (!isAuthorized(req, res)) return;
 
 	try {
-		const sql = await getSql();
+		const databaseUrl = process.env.DATABASE_URL;
+		if (!databaseUrl) return res.status(503).json({ success: false, error: "DATABASE_URL manquante." });
+		const { neon } = await import("@neondatabase/serverless");
+		const sql = neon(databaseUrl);
 		const productId = String(req.query?.id || "");
 
 		if (req.method === "DELETE" && productId) {
