@@ -36,6 +36,12 @@ async function readJson(req: any) {
 }
 
 async function verifyPinHandler(req: any, res: any) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("X-Deploy-Version", "manual-fix");
+
+  if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ success: false, error: "Méthode non autorisée." });
@@ -114,25 +120,23 @@ async function verifyPinHandler(req: any, res: any) {
       success: false,
       error: err?.message || "Erreur serveur lors de la vérification du PIN.",
       fullError: String(err),
+      stack: err?.stack?.split("\n").slice(0,3),
     });
   }
 }
 
-export default async function handler(req: any, res: any) {
-  try {
+async function mainHandler(req: any, res: any) {
+  if (req.method === "POST") {
+    return await verifyPinHandler(req, res);
+  } else if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    if (req.method === "OPTIONS") return res.status(200).end();
-    return await verifyPinHandler(req, res);
-  } catch (error) {
-    console.error("[VERIFY_PIN_HANDLER_ERROR]", error);
-    if (!res.headersSent) {
-      return res.status(500).json({
-        success: false,
-        error: "Une erreur serveur est survenue. Veuillez réessayer.",
-      });
-    }
+    return res.status(200).end();
+  } else if (req.method === "GET") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ success: false, error: "Méthode non autorisée." });
   }
 }
+
+export default mainHandler;
