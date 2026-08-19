@@ -39,7 +39,6 @@ async function verifyPinHandler(req: any, res: any) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("X-Deploy-Version", "manual-fix");
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") {
@@ -61,17 +60,12 @@ async function verifyPinHandler(req: any, res: any) {
     }
 
     // Import neon dynamically
-    console.log("[VERIFY_PIN] Importing neon...");
     const { neon } = await import("@neondatabase/serverless");
-    console.log("[VERIFY_PIN] Creating sql function...");
     const sql = neon(DATABASE_URL);
     const normalizedPhone = normalizePhone(phone);
-    console.log("[VERIFY_PIN] Normalized phone:", normalizedPhone);
     
     // Fetch all users and filter by phone pattern
-    console.log("[VERIFY_PIN] Fetching users...");
       const allUsers = await sql`SELECT id, full_name, email, phone, pin, role, region, created_at FROM sat_users LIMIT 100;`;
-    console.log("[VERIFY_PIN] Got", allUsers?.length, "users");
     
     const user = allUsers.find((u: any) => {
       const userDigits = (u.phone || "").replace(/\D/g, "").slice(-9);
@@ -79,7 +73,6 @@ async function verifyPinHandler(req: any, res: any) {
     }) || null;
     
     if (!user) {
-      console.log("[VERIFY_PIN] User not found for phone:", phone);
       return res.status(404).json({
         success: false,
         error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN.",
@@ -87,7 +80,6 @@ async function verifyPinHandler(req: any, res: any) {
     }
 
     if (String(user.pin) !== String(pin)) {
-      console.log("[VERIFY_PIN] PIN mismatch");
       return res.status(401).json({ success: false, error: "Code PIN incorrect." });
     }
 
@@ -109,13 +101,9 @@ async function verifyPinHandler(req: any, res: any) {
       token: signJwt({ sub: account.id, phone: account.phone, role: account.role, email: account.email }),
     });
   } catch (err: any) {
-    console.error("[VERIFY_PIN_ERROR]", err?.message || err, err?.stack);
-    // Always return debug info for now
     return res.status(500).json({
       success: false,
       error: err?.message || "Erreur serveur lors de la vérification du PIN.",
-      fullError: String(err),
-      stack: err?.stack?.split("\n").slice(0,3),
     });
   }
 }
