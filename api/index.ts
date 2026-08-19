@@ -507,27 +507,6 @@ const getAiClient = async () => {
 // --- API ROUTES ---
 
 // 1. Health check & Database Status
-app.get("/api/health", async (_req, res) => {
-  let dbStatus = "connected";
-  let dbVersion = "Neon Serverless PostgreSQL";
-  try {
-    const { sql } = await import("../src/db/neon.ts");
-    const result = await sql`SELECT NOW() as current_time, current_database() as db_name;`;
-    dbStatus = `Connected to Neon DB: ${result[0]?.db_name || "senauratech_db"}`;
-  } catch (err: any) {
-    dbStatus = "Neon DB Fallback Ready";
-  }
-
-  res.json({
-    status: "ok",
-    service: "SEN AURA TECH Backend API",
-    version: "2.5.0",
-    database: dbStatus,
-    environment: process.env.NODE_ENV || "development",
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Neon Database Schema Migration & Diagnostic Endpoint
 app.get("/api/db/setup", requireAuth, requireAdmin, async (_req, res) => {
   try {

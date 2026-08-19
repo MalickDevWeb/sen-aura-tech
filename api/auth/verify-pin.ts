@@ -11,7 +11,12 @@ function signJwt(payload: Record<string, unknown>) {
 }
 
 async function readJson(req: any) {
-  if (req.body && typeof req.body === "object") return req.body;
+  if (req.body !== undefined && req.body !== null) {
+    if (typeof req.body === "object") return req.body;
+    if (typeof req.body === "string") return req.body ? JSON.parse(req.body) : {};
+  }
+
+  if (!req || typeof req[Symbol.asyncIterator] !== "function") return {};
 
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
