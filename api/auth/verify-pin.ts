@@ -39,8 +39,18 @@ async function verifyPinHandler(req: any, res: any) {
       return res.status(400).json({ success: false, error: "Téléphone et PIN requis." });
     }
 
-    const { neonDbService } = await import("../../src/db/neon-service");
-    const user = await neonDbService.getUserByPhone(phone);
+    const { sql } = await import("../../src/db/neon");
+    const normalizedPhone = String(phone).replace(/\D/g, "").slice(-9);
+    if (normalizedPhone.length !== 9) {
+      return res.status(400).json({ success: false, error: "Numéro de téléphone invalide." });
+    }
+
+    const rows = await sql`
+      SELECT * FROM sat_users
+      WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 9) = ${normalizedPhone}
+      LIMIT 1;
+    `;
+    const user = rows[0] || null;
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -74,12 +84,13 @@ async function verifyPinHandler(req: any, res: any) {
       token: signJwt({ sub: account.id, phone: account.phone, role: account.role, email: account.email }),
     });
   } catch (err: any) {
+    console.error("[VERIFY_PIN_DATABASE_ERROR]", err?.message || err);
     const isMissingDatabaseUrl = err?.message?.includes("DATABASE_URL");
-    return res.status(isMissingDatabaseUrl ? 503 : 500).json({
+    return res.status(503).json({
       success: false,
       error: isMissingDatabaseUrl
         ? "Connexion impossible : la base de données n'est pas configurée sur le serveur."
-        : "Erreur serveur lors de la vérification du PIN.",
+        : "Base de données temporairement indisponible. Réessayez dans quelques instants.",
     });
   }
 }
