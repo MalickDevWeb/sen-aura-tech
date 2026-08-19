@@ -34,12 +34,12 @@ async function verifyPinHandler(req: any, res: any) {
   }
 
   try {
-    const { neonDbService } = await import("../../src/db/neon-service");
     const { phone, pin } = await readJson(req);
     if (!phone || !pin) {
       return res.status(400).json({ success: false, error: "Téléphone et PIN requis." });
     }
 
+    const { neonDbService } = await import("../../src/db/neon-service");
     const user = await neonDbService.getUserByPhone(phone);
     if (!user) {
       return res.status(404).json({
