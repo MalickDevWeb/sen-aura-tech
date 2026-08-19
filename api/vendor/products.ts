@@ -14,6 +14,18 @@ export default async function handler(req: any, res: any) {
 
   try {
     const sql = await getSql();
+    const productId = String(req.query?.id || "");
+    if (req.method === "DELETE" && productId) {
+      await sql`DELETE FROM sat_products WHERE id = ${productId};`;
+      return res.json({ success: true, message: "Produit supprimé." });
+    }
+    if (req.method === "PUT" && productId) {
+      const body = req.body || {};
+      const rows = await sql`UPDATE sat_products SET stock = COALESCE(${body.stock}, stock), price_fcfa = COALESCE(${body.priceFCFA || body.price}, price_fcfa), updated_at = NOW() WHERE id = ${productId} RETURNING *;`;
+      return rows[0]
+        ? res.json({ success: true, product: mapProduct(rows[0]) })
+        : res.status(404).json({ success: false, error: "Produit introuvable." });
+    }
     if (req.method === "GET") {
       const rows = await sql`SELECT * FROM sat_products ORDER BY created_at DESC LIMIT 200;`;
       return res.json({ success: true, count: rows.length, products: rows.map(mapProduct) });
