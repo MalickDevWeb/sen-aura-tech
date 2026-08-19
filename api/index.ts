@@ -3724,6 +3724,67 @@ const handleGetProEarnings = async (_req: any, res: any) => {
 app.get("/api/pro/earnings", requireAuth, handleGetProEarnings);
 app.get("/api/prestataire/earnings", requireAuth, handleGetProEarnings);
 
+// === PRO PORTFOLIO / RÉALISATIONS ===
+const handleGetProPortfolio = async (req: any, res: any) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const proId = req.query.proId || req.user?.sub;
+    const portfolio = await neonDbService.getProPortfolio(proId);
+    res.json({ success: true, portfolio });
+  } catch (e) {
+    res.json({ success: true, portfolio: [] });
+  }
+};
+
+const handleCreateProPortfolio = async (req: any, res: any) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const proId = req.body.proId || req.user?.sub;
+    const payload = {
+      ...req.body,
+      proId,
+      proName: req.body.proName || req.user?.phone || "Prestataire",
+    };
+    if (!payload.proId) {
+      return res.status(400).json({ success: false, error: "Identifiant prestataire manquant." });
+    }
+    const created = await neonDbService.createProPortfolio(payload);
+    if (!created) return res.status(500).json({ success: false, error: "Impossible de créer la réalisation." });
+    res.json({ success: true, portfolio: created });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "Erreur lors de la création." });
+  }
+};
+
+const handleUpdateProPortfolio = async (req: any, res: any) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const { id } = req.params;
+    const updated = await neonDbService.updateProPortfolio(id, req.body);
+    if (!updated) return res.status(404).json({ success: false, error: "Réalisation introuvable." });
+    res.json({ success: true, portfolio: updated });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "Erreur lors de la mise à jour." });
+  }
+};
+
+const handleDeleteProPortfolio = async (req: any, res: any) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const { id } = req.params;
+    const ok = await neonDbService.deleteProPortfolio(id);
+    if (!ok) return res.status(404).json({ success: false, error: "Réalisation introuvable." });
+    res.json({ success: true, message: "Réalisation supprimée avec succès." });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "Erreur lors de la suppression." });
+  }
+};
+
+app.get("/api/pro/portfolio", requireAuth, handleGetProPortfolio);
+app.post("/api/pro/portfolio", requireAuth, handleCreateProPortfolio);
+app.put("/api/pro/portfolio/:id", requireAuth, handleUpdateProPortfolio);
+app.delete("/api/pro/portfolio/:id", requireAuth, handleDeleteProPortfolio);
+
 const handleProPayoutRequest = async (req: any, res: any) => {
   const { amountFCFA = 100000, paymentMethod = "WAVE", phone = "+221 77 555 44 33" } = req.body;
   const txRef = `${paymentMethod.toUpperCase()}-SN-${crypto.randomUUID().slice(0,8)}`;

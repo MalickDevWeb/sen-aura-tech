@@ -1558,7 +1558,172 @@ export const neonDbService = {
     }
   },
 
-  // === 14. PROGRAMS / INITIATIVES / FLAGSHIP ===
+  // === 14. PRO PORTFOLIO / RÉALISATIONS CHANTIERS ===
+  async getProPortfolio(proId?: string) {
+    try {
+      await this.ensureDb();
+      if (proId) {
+        const rows = await sql`SELECT * FROM sat_pro_portfolio WHERE pro_id = ${proId} ORDER BY created_at DESC;`;
+        return rows.map((r: any) => ({
+          id: r.id,
+          proId: r.pro_id,
+          proName: r.pro_name,
+          title: r.title,
+          specialty: r.specialty,
+          location: r.location,
+          estimatedCostFCFA: r.estimated_cost_fcfa,
+          executionTime: r.execution_time,
+          description: r.description,
+          guaranteePeriod: r.guarantee_period,
+          mainMediaUrl: r.main_media_url,
+          mainMediaType: r.main_media_type,
+          galleryImages: r.gallery_images || [],
+          verifiedBadge: r.verified_badge,
+          rating: r.rating,
+          viewsCount: r.views_count,
+          contactsCount: r.contacts_count,
+          isActive: r.is_active,
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+          updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
+        }));
+      }
+      const rows = await sql`SELECT * FROM sat_pro_portfolio ORDER BY created_at DESC LIMIT 200;`;
+      return rows.map((r: any) => ({
+        id: r.id,
+        proId: r.pro_id,
+        proName: r.pro_name,
+        title: r.title,
+        specialty: r.specialty,
+        location: r.location,
+        estimatedCostFCFA: r.estimated_cost_fcfa,
+        executionTime: r.execution_time,
+        description: r.description,
+        guaranteePeriod: r.guarantee_period,
+        mainMediaUrl: r.main_media_url,
+        mainMediaType: r.main_media_type,
+        galleryImages: r.gallery_images || [],
+        verifiedBadge: r.verified_badge,
+        rating: r.rating,
+        viewsCount: r.views_count,
+        contactsCount: r.contacts_count,
+        isActive: r.is_active,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
+      }));
+    } catch (e) {
+      console.error("Neon getProPortfolio error:", e);
+      return [];
+    }
+  },
+
+  async createProPortfolio(data: any) {
+    try {
+      await this.ensureDb();
+      const id = data.id || `PRT-${Date.now()}`;
+      const result = await sql`
+        INSERT INTO sat_pro_portfolio (
+          id, pro_id, pro_name, title, specialty, location, estimated_cost_fcfa,
+          execution_time, description, guarantee_period, main_media_url, main_media_type,
+          gallery_images, verified_badge, rating, views_count, contacts_count, is_active
+        ) VALUES (
+          ${id}, ${data.proId}, ${data.proName}, ${data.title}, ${data.specialty}, ${data.location}, ${data.estimatedCostFCFA || 0},
+          ${data.executionTime || ""}, ${data.description || ""}, ${data.guaranteePeriod || ""}, ${data.mainMediaUrl}, ${data.mainMediaType || "image"},
+          ${data.galleryImages || []}, ${data.verifiedBadge ?? true}, ${data.rating || 5.0}, 0, 0, true
+        )
+        RETURNING *;
+      `;
+      if (!result || result.length === 0) return null;
+      const r = result[0];
+      return {
+        id: r.id,
+        proId: r.pro_id,
+        proName: r.pro_name,
+        title: r.title,
+        specialty: r.specialty,
+        location: r.location,
+        estimatedCostFCFA: r.estimated_cost_fcfa,
+        executionTime: r.execution_time,
+        description: r.description,
+        guaranteePeriod: r.guarantee_period,
+        mainMediaUrl: r.main_media_url,
+        mainMediaType: r.main_media_type,
+        galleryImages: r.gallery_images || [],
+        verifiedBadge: r.verified_badge,
+        rating: r.rating,
+        viewsCount: r.views_count,
+        contactsCount: r.contacts_count,
+        isActive: r.is_active,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
+      };
+    } catch (e) {
+      console.error("Neon createProPortfolio error:", e);
+      return null;
+    }
+  },
+
+  async updateProPortfolio(id: string, data: any) {
+    try {
+      await this.ensureDb();
+      const result = await sql`
+        UPDATE sat_pro_portfolio SET
+          title = COALESCE(${data.title}, title),
+          specialty = COALESCE(${data.specialty}, specialty),
+          location = COALESCE(${data.location}, location),
+          estimated_cost_fcfa = COALESCE(${data.estimatedCostFCFA}, estimated_cost_fcfa),
+          execution_time = COALESCE(${data.executionTime}, execution_time),
+          description = COALESCE(${data.description}, description),
+          guarantee_period = COALESCE(${data.guaranteePeriod}, guarantee_period),
+          main_media_url = COALESCE(${data.mainMediaUrl}, main_media_url),
+          main_media_type = COALESCE(${data.mainMediaType}, main_media_type),
+          gallery_images = COALESCE(${data.galleryImages}, gallery_images),
+          is_active = COALESCE(${data.isActive}, is_active),
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *;
+      `;
+      if (!result || result.length === 0) return null;
+      const r = result[0];
+      return {
+        id: r.id,
+        proId: r.pro_id,
+        proName: r.pro_name,
+        title: r.title,
+        specialty: r.specialty,
+        location: r.location,
+        estimatedCostFCFA: r.estimated_cost_fcfa,
+        executionTime: r.execution_time,
+        description: r.description,
+        guaranteePeriod: r.guarantee_period,
+        mainMediaUrl: r.main_media_url,
+        mainMediaType: r.main_media_type,
+        galleryImages: r.gallery_images || [],
+        verifiedBadge: r.verified_badge,
+        rating: r.rating,
+        viewsCount: r.views_count,
+        contactsCount: r.contacts_count,
+        isActive: r.is_active,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
+      };
+    } catch (e) {
+      console.error("Neon updateProPortfolio error:", e);
+      return null;
+    }
+  },
+
+  async deleteProPortfolio(id: string) {
+    try {
+      await this.ensureDb();
+      await sql`DELETE FROM sat_pro_portfolio WHERE id = ${id};`;
+      return true;
+    } catch (e) {
+      console.error("Neon deleteProPortfolio error:", e);
+      return false;
+    }
+  },
+
+  // === 15. PROGRAMS / INITIATIVES / FLAGSHIP ===
   async getAllPrograms() {
     try {
       await this.ensureDb();

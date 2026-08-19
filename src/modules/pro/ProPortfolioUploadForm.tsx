@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Upload,
@@ -22,17 +22,21 @@ import {
   Zap,
   Cpu,
   Layers,
-  PhoneCall
+  PhoneCall,
+  Edit3
 } from "lucide-react";
 import { uploadToCloudinary, CloudinaryUploadResult } from "../../lib/cloudinary";
 import { formatCurrency } from "../../config/constants";
 import CloudinaryDropzone from "../../components/common/CloudinaryDropzone";
 import PublishingProcessModal from "../../components/common/PublishingProcessModal";
+import { authFetch } from "../../lib/authFetch";
 
 interface ProPortfolioUploadFormProps {
   onServiceCreated: (service: any) => void;
+  onServiceUpdated?: (service: any) => void;
   onCancel?: () => void;
   currency?: "FCFA" | "EUR";
+  editItem?: any;
 }
 
 interface SpecialtyOption {
@@ -132,9 +136,28 @@ const REAL_PROJECT_PRESETS = [
 
 export const ProPortfolioUploadForm: React.FC<ProPortfolioUploadFormProps> = ({
   onServiceCreated,
+  onServiceUpdated,
   onCancel,
   currency = "FCFA",
+  editItem,
 }) => {
+  const isEdit = !!editItem;
+
+  useEffect(() => {
+    if (isEdit && editItem) {
+      setTitle(editItem.title || "");
+      setSpecialty(editItem.specialty || "Installation Solaire & Onduleurs");
+      setLocation(editItem.location || "Dakar & Régions");
+      setEstimatedCostFCFA(String(editItem.estimatedCostFCFA || 120000));
+      setExecutionTime(editItem.executionTime || "1 à 2 Jours");
+      setDescription(editItem.description || "");
+      setGuaranteePeriod(editItem.guaranteePeriod || "12 Mois Garantie Main d'œuvre");
+      setMainMediaUrl(editItem.mainMediaUrl || "");
+      setMainMediaType(editItem.mainMediaType || "image");
+      setGalleryImages(editItem.galleryImages || []);
+    }
+  }, [isEdit, editItem]);
+
   // Media state
   const [mainMediaType, setMainMediaType] = useState<"image" | "video">("image");
   const [mainMediaUrl, setMainMediaUrl] = useState<string>("");
@@ -227,8 +250,12 @@ export const ProPortfolioUploadForm: React.FC<ProPortfolioUploadFormProps> = ({
     setIsSubmitting(true);
     setErrorMsg("");
 
-    const servicePayload = {
-      id: `PRO-SRV-${Date.now()}`,
+    const token = localStorage.getItem("senaura_auth_token");
+    const proId = token ? JSON.parse(atob(token.split(".")[1]).replace(/\\"/g, '"'))?.id : undefined;
+
+    const servicePayload: any = {
+      proId: proId || editItem?.proId,
+      proName: editItem?.proName || "Prestataire",
       title: title.trim(),
       specialty,
       location,
@@ -241,23 +268,63 @@ export const ProPortfolioUploadForm: React.FC<ProPortfolioUploadFormProps> = ({
       galleryImages: galleryImages.filter(Boolean),
       verifiedBadge: true,
       rating: 5.0,
-      createdAt: new Date().toISOString(),
     };
 
     try {
+      let endpoint = "/api/pro/portfolio";
+      let method = "POST";
+      let finalPayload = servicePayload;
+
+      if (isEdit && editItem?.id) {
+        endpoint = `/api/pro/portfolio/${editItem.id}`;
+        method = "PUT";
+        finalPayload = {
+          title: servicePayload.title,
+          specialty: servicePayload.specialty,
+          location: servicePayload.location,
+          estimatedCostFCFA: servicePayload.estimatedCostFCFA,
+          executionTime: servicePayload.executionTime,
+          description: servicePayload.description,
+          guaranteePeriod: servicePayload.guaranteePeriod,
+          mainMediaUrl: servicePayload.mainMediaUrl,
+          mainMediaType: servicePayload.mainMediaType,
+          galleryImages: servicePayload.galleryImages,
+          isActive: true,
+        };
+      }
+
+      const res = await authFetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(finalPayload),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        setErrorMsg(data.error || "Erreur lors de l'enregistrement.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const saved = data.portfolio || data.service || servicePayload;
       setLastPublishedData({
         title: title.trim(),
         category: specialty,
         priceFCFA: parseInt(estimatedCostFCFA || "80000", 10),
         mainMediaUrl,
         mediaType: mainMediaType,
-        sku: servicePayload.id,
+        sku: saved.id,
         type: "service",
       });
       setShowPublishModal(true);
 
-      onServiceCreated(servicePayload);
-      setSuccessMsg(`Prestation / Réalisation "${title}" publiée avec succès sur votre profil !`);
+      if (isEdit) {
+        onServiceUpdated?.(saved);
+        setSuccessMsg("Réalisation modifiée avec succès !");
+      } else {
+        onServiceCreated(saved);
+        setSuccessMsg(`Prestation / Réalisation "${title}" publiée avec succès sur votre profil !`);
+      }
 
       setTimeout(() => {
         setTitle("");
@@ -265,9 +332,12 @@ export const ProPortfolioUploadForm: React.FC<ProPortfolioUploadFormProps> = ({
         setGalleryImages([]);
         setDescription("");
         setSuccessMsg("");
-      }, 1200);
+        setShowPublishModal(false);
+        if (!isEdit && onCancel) onCancel();
+      }, 1500);
     } catch (err) {
       console.error("Erreur de sauvegarde:", err);
+      setErrorMsg("Erreur réseau lors de l'enregistrement.");
     } finally {
       setIsSubmitting(false);
     }
@@ -285,13 +355,15 @@ export const ProPortfolioUploadForm: React.FC<ProPortfolioUploadFormProps> = ({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border border-amber-500/40 text-xs font-black text-amber-300 mb-2">
             <Wrench className="w-3.5 h-3.5 text-amber-400" />
-            <span>ESPACE PRESTATAIRE • PORTFOLIO CHANTIERS HD</span>
+            <span>{isEdit ? "ESPACE PRESTATAIRE • MODIFIER RÉALISATION" : "ESPACE PRESTATAIRE • PORTFOLIO CHANTIERS HD"}</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            Publier une Réalisation / Prestation Technique (Photo / Vidéo HD)
+            {isEdit ? "Modifier ma Réalisation / Prestation" : "Publier une Réalisation / Prestation Technique (Photo / Vidéo HD)"}
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Mettez en valeur vos travaux sur le terrain avec <strong className="text-amber-400">1 média avant/après HD</strong> + jusqu'à <strong className="text-amber-400">3 photos de chantier</strong> pour attirer de nouveaux clients au Sénégal.
+            {isEdit
+              ? "Modifiez les informations de votre réalisation. Les changements seront appliqués immédiatement."
+              : "Mettez en valeur vos travaux sur le terrain avec <strong className=\"text-amber-400\">1 média avant/après HD</strong> + jusqu'à <strong className=\"text-amber-400\">3 photos de chantier</strong> pour attirer de nouveaux clients au Sénégal."}
           </p>
         </div>
 
@@ -576,12 +648,12 @@ export const ProPortfolioUploadForm: React.FC<ProPortfolioUploadFormProps> = ({
               {isSubmitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Publication en cours...</span>
+                  <span>{isEdit ? "Enregistrement..." : "Publication en cours..."}</span>
                 </>
               ) : (
                 <>
-                  <Wrench className="w-5 h-5" />
-                  <span>Publier la Prestation / Chantier sur mon Profil Pro ⚡</span>
+                  {isEdit ? <Edit3 className="w-5 h-5" /> : <Wrench className="w-5 h-5" />}
+                  <span>{isEdit ? "Enregistrer les Modifications" : "Publier la Prestation / Chantier sur mon Profil Pro ⚡"}</span>
                 </>
               )}
             </button>

@@ -36,6 +36,7 @@ import {
 import { formatCurrency } from "../../config/constants";
 import { store } from "../../database/store";
 import { ProPortfolioUploadForm } from "./ProPortfolioUploadForm";
+import { ProPortfolioManager } from "./ProPortfolioManager";
 import { authFetch } from "../../lib/authFetch";
 
 interface ProDashboardViewProps {
@@ -164,6 +165,10 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
   // Profile Edit state
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
+
+  // Portfolio state
+  const [portfolioSubTab, setPortfolioSubTab] = useState<"list" | "create" | "edit">("list");
+  const [editingPortfolioItem, setEditingPortfolioItem] = useState<any>(null);
 
   // Load Data from API
   const fetchData = async () => {
@@ -918,14 +923,46 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
       {/* TAB 3: PUBLIER CHANTIER / SERVICE HD (PRO PORTFOLIO FORM)                */}
       {/* ========================================================================= */}
       {proTab === "portfolio" && (
-        <ProPortfolioUploadForm
-          currency={currency}
-          onCancel={() => setProTab("missions")}
-          onServiceCreated={(newService) => {
-            showToast("Votre réalisation de chantier a été publiée avec succès sur le catalogue !");
-            setProTab("missions");
-          }}
-        />
+        <div className="space-y-6">
+          {portfolioSubTab === "list" && (
+            <ProPortfolioManager
+              proId={store.currentUser.id}
+              proName={profile.fullName}
+              currency={currency}
+              onCreate={() => {
+                setEditingPortfolioItem(null);
+                setPortfolioSubTab("create");
+              }}
+              onEdit={(item) => {
+                setEditingPortfolioItem(item);
+                setPortfolioSubTab("edit");
+              }}
+              onDeleted={() => {
+                showToast("Réalisation supprimée avec succès.");
+              }}
+            />
+          )}
+          {(portfolioSubTab === "create" || portfolioSubTab === "edit") && (
+            <ProPortfolioUploadForm
+              currency={currency}
+              editItem={portfolioSubTab === "edit" ? editingPortfolioItem : undefined}
+              onServiceCreated={(newService) => {
+                showToast("Votre réalisation de chantier a été publiée avec succès sur le catalogue !");
+                setPortfolioSubTab("list");
+                setEditingPortfolioItem(null);
+              }}
+              onServiceUpdated={(updated) => {
+                showToast("Réalisation modifiée avec succès !");
+                setPortfolioSubTab("list");
+                setEditingPortfolioItem(null);
+              }}
+              onCancel={() => {
+                setPortfolioSubTab("list");
+                setEditingPortfolioItem(null);
+              }}
+            />
+          )}
+        </div>
       )}
 
       {/* ========================================================================= */}
