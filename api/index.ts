@@ -692,11 +692,11 @@ app.post("/api/auth/verify-pin", async (req, res) => {
     const user = await neonDbService.getUserByPhone(phone);
 
     if (!user) {
-      return res.json({ success: false, error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN." });
+      return res.status(404).json({ success: false, error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN." });
     }
 
     if (user.pin !== pin) {
-      return res.json({ success: false, error: "Code PIN incorrect." });
+      return res.status(401).json({ success: false, error: "Code PIN incorrect." });
     }
 
     const userData = (user.data && typeof user.data === "object") ? user.data : {};
@@ -5394,4 +5394,3 @@ app.delete("/api/publications/:id", async (req, res) => {
 });
 
 export default app;
-

@@ -12,6 +12,13 @@ export const neonDbService = {
   },
 
   // === 1. UTILISATEURS & VÉRIFICATION D'UNICITÉ (DATABASE SIDE) ===
+  normalizePhone(phone: string = ""): string {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.startsWith("00221") && digits.length > 9) return digits.slice(5).slice(-9);
+    if (digits.startsWith("221") && digits.length > 9) return digits.slice(3).slice(-9);
+    return digits.slice(-9);
+  },
+
   async checkUserUniqueness(phone: string, email?: string, excludeUserId?: string): Promise<{
     available: boolean;
     isPhoneTaken: boolean;
@@ -21,10 +28,7 @@ export const neonDbService = {
   }> {
     try {
       await this.ensureDb();
-      const cleanDigits = phone ? phone.replace(/\D/g, "") : "";
-      const normalizedPhone = cleanDigits.startsWith("221") && cleanDigits.length === 12
-        ? cleanDigits.slice(3)
-        : cleanDigits;
+      const normalizedPhone = this.normalizePhone(phone);
       const normalizedEmail = email ? email.trim().toLowerCase() : "";
 
       let isPhoneTaken = false;
@@ -35,10 +39,7 @@ export const neonDbService = {
       if (normalizedPhone) {
         const phoneResult = await sql`
           SELECT * FROM sat_users 
-          WHERE (REPLACE(REPLACE(REPLACE(phone, ' ', ''), '+221', ''), '-', '') = ${normalizedPhone}
-                 OR phone = ${phone} 
-                 OR phone = ${`+221 ${normalizedPhone}`}
-                 OR phone = ${`+221${normalizedPhone}`})
+          WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 9) = ${normalizedPhone}
           ${excludeUserId ? sql`AND id != ${excludeUserId}` : sql``}
           LIMIT 1;
         `;
@@ -161,15 +162,11 @@ export const neonDbService = {
   async getUserByPhone(phone: string) {
     try {
       await this.ensureDb();
-      const cleanDigits = phone.replace(/\D/g, "");
-      const normalizedPhone = cleanDigits.startsWith("221") && cleanDigits.length === 12
-        ? cleanDigits.slice(3)
-        : cleanDigits;
+      const normalizedPhone = this.normalizePhone(phone);
+      if (!normalizedPhone) return null;
       const result = await sql`
         SELECT * FROM sat_users 
-        WHERE (REPLACE(REPLACE(REPLACE(phone, ' ', ''), '+221', ''), '-', '') = ${normalizedPhone}
-               OR phone = ${phone}
-               OR phone = ${`+221 ${normalizedPhone}`})
+        WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 9) = ${normalizedPhone}
         LIMIT 1;
       `;
       return result[0] || null;

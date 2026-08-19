@@ -466,12 +466,14 @@ export class SecurityPinService {
     }
 
     // 1. Appel sécurisé à l'API Backend pour valider via NeonDB
+    let backendWasReachable = false;
     try {
       const response = await authFetch("/api/auth/verify-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: cleanPhone, pin })
       });
+      backendWasReachable = true;
       const data = await response.json();
       
       if (data.success && data.account) {
@@ -489,10 +491,30 @@ export class SecurityPinService {
           localStorage.setItem(`sat_user_sec_${cleanPhone}`, JSON.stringify(accountToCache));
         } catch {}
         return { success: true, account: accountToCache };
-      } else if (response.status === 401 || !data.success) {
-        throw new Error(data.error || "Code PIN incorrect.");
       }
+
+      if (response.status === 401) {
+        return { success: false, error: data.error || "Code PIN incorrect." };
+      }
+
+      if (response.status === 404 || data.error?.includes("n'a pas encore de compte")) {
+        return {
+          success: false,
+          error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN.",
+        };
+      }
+
+      return {
+        success: false,
+        error: data.error || "Impossible de vérifier ce compte pour le moment. Réessayez dans quelques instants.",
+      };
     } catch (err: any) {
+      if (backendWasReachable) {
+        return {
+          success: false,
+          error: err?.message || "Impossible de vérifier ce compte pour le moment. Réessayez dans quelques instants.",
+        };
+      }
       console.warn("Backend auth failed, falling back to local storage...", err?.message);
     }
 
@@ -501,7 +523,7 @@ export class SecurityPinService {
     if (!exists || !account) {
       return {
         success: false,
-        error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN.",
+        error: "Connexion au serveur impossible. Ce compte existe peut-être dans la base, mais il n'est pas disponible en cache local sur cet appareil.",
       };
     }
 

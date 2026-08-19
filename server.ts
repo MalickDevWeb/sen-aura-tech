@@ -5,7 +5,7 @@ import express from "express";
 import app from "./api/index.ts";
 
 async function startServer() {
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   // --- VITE / STATIC SERVING ---
   if (process.env.NODE_ENV !== "production") {
