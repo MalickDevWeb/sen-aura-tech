@@ -60,6 +60,6 @@ export default async function handler(req: any, res: any) {
 		return res.status(405).json({ success: false, error: "Méthode non autorisée." });
 	} catch (error: any) {
 		console.error("[VENDOR_PRODUCTS]", error);
-		return res.status(500).json({ success: false, error: "Erreur lors de l'accès aux produits." });
+		return res.status(500).json({ success: false, error: error?.message || "Erreur lors de l'accès aux produits." });
 	}
 }
