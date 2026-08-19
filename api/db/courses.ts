@@ -1,6 +1,4 @@
-import { withErrorBoundary, VercelRequest, VercelResponse } from "../middleware/handler";
-
-async function coursesHandler(req: VercelRequest, res: VercelResponse) {
+async function coursesHandler(req: any, res: any) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ success: false, error: "Méthode non autorisée." });
@@ -16,4 +14,15 @@ async function coursesHandler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-export default withErrorBoundary(coursesHandler);
+export default async function handler(req: any, res: any) {
+  try {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") return res.status(200).end();
+    return await coursesHandler(req, res);
+  } catch (error) {
+    console.error("[COURSES_HANDLER_ERROR]", error);
+    if (!res.headersSent) return res.status(500).json({ success: false, error: "Erreur serveur." });
+  }
+}

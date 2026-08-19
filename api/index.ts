@@ -1,6 +1,5 @@
 import express from "express";
 import crypto from "crypto";
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 
 const neonDbService: any = new Proxy({}, {
@@ -488,12 +487,13 @@ const inMemoryData: {
 };
 
 // Initialize Gemini AI Client safely
-const getAiClient = () => {
+const getAiClient = async () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("GEMINI_API_KEY non configurée. Réponses simulées utilisées.");
     return null;
   }
+  const { GoogleGenAI } = await import("@google/genai");
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
@@ -1222,7 +1222,7 @@ app.post("/api/ai/advise", async (req, res) => {
       return res.status(400).json({ error: "Le champ prompt est obligatoire" });
     }
 
-    const ai = getAiClient();
+    const ai = await getAiClient();
     if (!ai) {
       return res.json({
         reply: `Bonjour ! En tant qu'Assistant SEN AURA TECH, j'ai bien analysé votre demande : "${prompt}". 
@@ -3993,7 +3993,7 @@ app.get("/api/user/quotes", requireAuth, handleClientQuotes);
 app.post("/api/ai/chat", async (req, res) => {
   try {
     const { message, conversationHistory = [] } = req.body;
-    const ai = getAiClient();
+    const ai = await getAiClient();
     if (ai) {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -4043,7 +4043,7 @@ app.post("/api/ai/live-session", (_req, res) => {
 app.post("/api/gemini/generate", async (req, res) => {
   try {
     const { prompt } = req.body;
-    const ai = getAiClient();
+    const ai = await getAiClient();
     if (ai) {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
