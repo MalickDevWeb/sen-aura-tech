@@ -70,7 +70,7 @@ async function verifyPinHandler(req: any, res: any) {
     
     // Fetch all users and filter by phone pattern
     console.log("[VERIFY_PIN] Fetching users...");
-    const allUsers = await sql`SELECT id, full_name, email, phone, pin, role, region, data, created_at FROM sat_users LIMIT 100;`;
+      const allUsers = await sql`SELECT id, full_name, email, phone, pin, role, region, created_at FROM sat_users LIMIT 100;`;
     console.log("[VERIFY_PIN] Got", allUsers?.length, "users");
     
     const user = allUsers.find((u: any) => {
@@ -91,7 +91,6 @@ async function verifyPinHandler(req: any, res: any) {
       return res.status(401).json({ success: false, error: "Code PIN incorrect." });
     }
 
-    const userData = user.data && typeof user.data === "object" ? user.data : {};
     const account = {
       id: user.id,
       fullName: user.full_name,
@@ -101,10 +100,6 @@ async function verifyPinHandler(req: any, res: any) {
       role: user.role || "CLIENT",
       region: user.region || "Dakar",
       createdAt: user.created_at,
-      proStatus: userData.proStatus,
-      proApproved: userData.proApproved || false,
-      trialExpiresAt: userData.trialExpiresAt,
-      proFreeTrialActive: userData.proFreeTrialActive || false,
     };
 
     console.log("[VERIFY_PIN] Login successful for:", account.fullName);
