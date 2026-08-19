@@ -29,6 +29,22 @@
     "api/db/providers.ts": {
       "maxDuration": 30,
       "memory": 1024
+    },
+    "api/db/users.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "api/db/users/sync.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "api/db/orders.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "api/vendor/products.ts": {
+      "maxDuration": 30,
+      "memory": 1024
     }
   }
 }
