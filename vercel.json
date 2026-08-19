@@ -9,7 +9,7 @@
     "NODE_ENV": "production"
   },
   "functions": {
-    "api/index.cjs": {
+    "api/index.ts": {
       "maxDuration": 30
     }
   }
