@@ -1,5 +1,4 @@
-import crypto from "crypto";
-import { withErrorBoundary, readJson, VercelRequest, VercelResponse } from "../middleware/handler";
+import crypto from "node:crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 
@@ -11,7 +10,19 @@ function signJwt(payload: Record<string, unknown>) {
   return `${header}.${body}.${signature}`;
 }
 
-async function verifyPinHandler(req: VercelRequest, res: VercelResponse) {
+async function readJson(req: any) {
+  if (req.body && typeof req.body === "object") return req.body;
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  const rawBody = Buffer.concat(chunks).toString("utf8");
+  return rawBody ? JSON.parse(rawBody) : {};
+}
+
+async function verifyPinHandler(req: any, res: any) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ success: false, error: "Méthode non autorisée." });
@@ -68,4 +79,21 @@ async function verifyPinHandler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-export default withErrorBoundary(verifyPinHandler);
+export default async function handler(req: any, res: any) {
+  try {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") return res.status(200).end();
+    return await verifyPinHandler(req, res);
+  } catch (error) {
+    console.error("[VERIFY_PIN_HANDLER_ERROR]", error);
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        error: "Une erreur serveur est survenue. Veuillez réessayer.",
+      });
+    }
+  }
+}
