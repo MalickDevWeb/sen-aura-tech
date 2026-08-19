@@ -47,7 +47,7 @@ async function verifyPinHandler(req: any, res: any) {
 
     const rows = await sql`
       SELECT * FROM sat_users
-      WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 9) = ${normalizedPhone}
+      WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE '%' || ${normalizedPhone}
       LIMIT 1;
     `;
     const user = rows[0] || null;
