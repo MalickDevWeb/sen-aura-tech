@@ -132,20 +132,22 @@ export const neonDbService = {
       if (user.phone || user.email) {
         const uniqueness = await this.checkUserUniqueness(user.phone, user.email, user.id);
         if (!uniqueness.available && uniqueness.existingUser && uniqueness.existingUser.id !== user.id) {
-          console.warn("Neon upsertUser blocked duplicate user:", uniqueness.error);
-          return { error: uniqueness.error, duplicate: true };
+          console.warn("Neon upsertUser returning existing user:", uniqueness.error);
+          return { ...uniqueness.existingUser, existing: true };
         }
       }
 
       const result = await sql`
-        INSERT INTO sat_users (id, full_name, email, phone, role, region, pin, verified, updated_at)
-        VALUES (${user.id}, ${user.fullName}, ${user.email || ""}, ${user.phone}, ${user.role}, ${user.region || "Dakar"}, ${pin}, ${user.verified || false}, NOW())
+        INSERT INTO sat_users (id, full_name, email, phone, role, region, pin, verified, data, password_hash, updated_at)
+        VALUES (${user.id}, ${user.fullName}, ${user.email || ""}, ${user.phone}, ${user.role}, ${user.region || "Dakar"}, ${pin}, ${user.verified || false}, ${JSON.stringify(user as any)}, ${(user as any).passwordHash || null}, NOW())
         ON CONFLICT (phone) DO UPDATE SET
           full_name = EXCLUDED.full_name,
           email = EXCLUDED.email,
           role = EXCLUDED.role,
           region = EXCLUDED.region,
           verified = EXCLUDED.verified,
+          data = EXCLUDED.data,
+          password_hash = EXCLUDED.password_hash,
           updated_at = NOW()
         RETURNING *;
       `;
@@ -276,6 +278,30 @@ export const neonDbService = {
   },
 
   // === 2. DEVIS & PROJETS ===
+  async generateSequentialQuoteId(): Promise<string> {
+    try {
+      await this.ensureDb();
+      const res = await sql`SELECT nextval('sat_quotes_seq') as seq_value`;
+      const num = res[0].seq_value;
+      return `DEVIS-${String(num).padStart(5, '0')}`;
+    } catch (e) {
+      console.warn("generateSequentialQuoteId fallback:", e);
+      return `DEVIS-${Math.floor(10000 + Math.random() * 90000)}`;
+    }
+  },
+
+  async generateSequentialOrderId(): Promise<string> {
+    try {
+      await this.ensureDb();
+      const res = await sql`SELECT nextval('sat_orders_seq') as seq_value`;
+      const num = res[0].seq_value;
+      return `CMD-${String(num).padStart(5, '0')}`;
+    } catch (e) {
+      console.warn("generateSequentialOrderId fallback:", e);
+      return `CMD-${Math.floor(10000 + Math.random() * 90000)}`;
+    }
+  },
+
   async saveQuote(quote: QuoteRequestDTO) {
     try {
       await this.ensureDb();
@@ -1862,4 +1888,114 @@ export const neonDbService = {
       return false;
     }
   },
+
+  // === 13. SÉCURITÉ & PARE-FEU ===
+  async getSecuritySettings() {
+    try {
+      await this.ensureDb();
+      const res = await sql`SELECT config_json FROM sat_system_config WHERE key = 'security_settings' LIMIT 1;`;
+      if (res && res.length > 0) {
+        return res[0].config_json;
+      }
+      return { maxAttempts: 3, lockDurationMinutes: 15 };
+    } catch {
+      return { maxAttempts: 3, lockDurationMinutes: 15 };
+    }
+  },
+
+  async updateSecuritySettings(settings: { maxAttempts: number, lockDurationMinutes: number }) {
+    try {
+      await this.ensureDb();
+      await sql`
+        INSERT INTO sat_system_config (key, config_json) 
+        VALUES ('security_settings', ${JSON.stringify(settings)})
+        ON CONFLICT (key) DO UPDATE SET config_json = EXCLUDED.config_json, updated_at = NOW();
+      `;
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async getSecurityStatus(ip: string) {
+    try {
+      await this.ensureDb();
+      const res = await sql`SELECT * FROM sat_blocked_ips WHERE ip_address = ${ip} LIMIT 1;`;
+      if (res && res.length > 0) {
+        const record = res[0];
+        if (record.status === 'BLOCKED') {
+          if (record.unlocks_at && new Date(record.unlocks_at) < new Date()) {
+            await sql`DELETE FROM sat_blocked_ips WHERE ip_address = ${ip};`;
+            return { blocked: false, attempts: 0 };
+          }
+          return { blocked: true, attempts: record.attempts, unlocksAt: record.unlocks_at };
+        }
+        return { blocked: false, attempts: record.attempts };
+      }
+      return { blocked: false, attempts: 0 };
+    } catch {
+      return { blocked: false, attempts: 0 };
+    }
+  },
+
+  async recordFailedAttempt(ip: string, phone: string) {
+    try {
+      await this.ensureDb();
+      const settings = await this.getSecuritySettings();
+      const maxAttempts = settings.maxAttempts || 3;
+      const lockMinutes = settings.lockDurationMinutes || 15;
+
+      const status = await this.getSecurityStatus(ip);
+      const newAttempts = status.attempts + 1;
+      let newStatus = 'WARNING';
+      let unlocksAt = null;
+
+      if (newAttempts >= maxAttempts) {
+        newStatus = 'BLOCKED';
+        unlocksAt = new Date(Date.now() + lockMinutes * 60000).toISOString();
+      }
+
+      await sql`
+        INSERT INTO sat_blocked_ips (ip_address, reason, attempts, status, unlocks_at)
+        VALUES (${ip}, ${'Échec PIN: ' + phone}, ${newAttempts}, ${newStatus}, ${unlocksAt})
+        ON CONFLICT (ip_address) DO UPDATE SET 
+          attempts = EXCLUDED.attempts, 
+          status = EXCLUDED.status, 
+          unlocks_at = EXCLUDED.unlocks_at,
+          reason = EXCLUDED.reason;
+      `;
+      return { blocked: newStatus === 'BLOCKED', attempts: newAttempts, unlocksAt };
+    } catch (e) {
+      console.warn("Neon recordFailedAttempt warning:", e);
+      return { blocked: false, attempts: 1 };
+    }
+  },
+
+  async resetFailedAttempts(ip: string) {
+    try {
+      await this.ensureDb();
+      await sql`DELETE FROM sat_blocked_ips WHERE ip_address = ${ip};`;
+    } catch {}
+  },
+
+  async unblockIp(ip: string) {
+    return this.resetFailedAttempts(ip);
+  },
+
+  async getAllBlockedIps() {
+    try {
+      await this.ensureDb();
+      const rows = await sql`SELECT * FROM sat_blocked_ips ORDER BY created_at DESC;`;
+      return rows.map((r: any) => ({
+        ipAddress: r.ip_address,
+        reason: r.reason,
+        attempts: r.attempts,
+        status: r.status,
+        unlocksAt: r.unlocks_at ? new Date(r.unlocks_at).toISOString() : null,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+      }));
+    } catch {
+      return [];
+    }
+  }
 };

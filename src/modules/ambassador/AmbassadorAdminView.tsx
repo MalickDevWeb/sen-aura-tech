@@ -1,3 +1,4 @@
+import { authFetch } from "../../lib/authFetch";
 import React, { useState, useEffect } from "react";
 import {
   Users,
@@ -140,35 +141,35 @@ export const AmbassadorAdminView: React.FC = () => {
     setIsLoading(true);
     try {
       // 1. Applications
-      const appRes = await fetch("/api/ambassadors/applications");
+      const appRes = await authFetch("/api/ambassadors/applications");
       const appData = await appRes.json();
       if (appData.success) {
         setApplications(appData.applications);
       }
 
       // 2. Prospects
-      const prosRes = await fetch("/api/ambassadors/prospects");
+      const prosRes = await authFetch("/api/ambassadors/prospects");
       const prosData = await prosRes.json();
       if (prosData.success) {
         setProspects(prosData.prospects);
       }
 
       // 3. Commissions
-      const commRes = await fetch("/api/ambassadors/commissions");
+      const commRes = await authFetch("/api/ambassadors/commissions");
       const commData = await commRes.json();
       if (commData.success) {
         setCommissions(commData.commissions);
       }
 
       // 4. Payouts
-      const payRes = await fetch("/api/ambassadors/payouts");
+      const payRes = await authFetch("/api/ambassadors/payouts");
       const payData = await payRes.json();
       if (payData.success) {
         setPayouts(payData.payouts);
       }
 
       // 5. Global Stats
-      const statRes = await fetch("/api/ambassadors/stats");
+      const statRes = await authFetch("/api/ambassadors/stats");
       const statData = await statRes.json();
       if (statData.success) {
         setStats(statData.stats);
@@ -196,7 +197,7 @@ export const AmbassadorAdminView: React.FC = () => {
   const handleConfirmValidation = async () => {
     if (!validatingApp) return;
     try {
-      const res = await fetch(`/api/ambassadors/applications/${validatingApp.id}/status`, {
+      const res = await authFetch(`/api/ambassadors/applications/${validatingApp.id}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -223,7 +224,7 @@ export const AmbassadorAdminView: React.FC = () => {
   const handleConfirmRejection = async () => {
     if (!rejectingApp) return;
     try {
-      const res = await fetch(`/api/ambassadors/applications/${rejectingApp.id}/status`, {
+      const res = await authFetch(`/api/ambassadors/applications/${rejectingApp.id}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -256,7 +257,7 @@ export const AmbassadorAdminView: React.FC = () => {
     }
 
     try {
-      const res = await fetch(`/api/ambassadors/prospects/${prospectId}/status`, {
+      const res = await authFetch(`/api/ambassadors/prospects/${prospectId}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })
@@ -275,7 +276,7 @@ export const AmbassadorAdminView: React.FC = () => {
   const handleConfirmSignedDeal = async () => {
     if (!signingProspect) return;
     try {
-      const res = await fetch(`/api/ambassadors/prospects/${signingProspect.id}/status`, {
+      const res = await authFetch(`/api/ambassadors/prospects/${signingProspect.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -313,7 +314,7 @@ export const AmbassadorAdminView: React.FC = () => {
   const handleCreateProspect = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/ambassadors/prospects", {
+      const res = await authFetch("/api/ambassadors/prospects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newProspectForm)
@@ -373,7 +374,7 @@ export const AmbassadorAdminView: React.FC = () => {
   const finishPayout = async () => {
     if (!processingPayout) return;
     try {
-      const res = await fetch(`/api/ambassadors/payouts/${processingPayout.id}/process`, {
+      const res = await authFetch(`/api/ambassadors/payouts/${processingPayout.id}/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

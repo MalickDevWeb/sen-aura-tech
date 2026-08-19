@@ -36,6 +36,7 @@ import {
 import { formatCurrency } from "../../config/constants";
 import { store } from "../../database/store";
 import { ProPortfolioUploadForm } from "./ProPortfolioUploadForm";
+import { authFetch } from "../../lib/authFetch";
 
 interface ProDashboardViewProps {
   currency: "FCFA" | "EUR";
@@ -169,9 +170,9 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
     try {
       setLoading(true);
       const [resStats, resMissions, resEarnings] = await Promise.all([
-        fetch("/api/pro/stats").then((r) => r.json()),
-        fetch("/api/pro/missions").then((r) => r.json()),
-        fetch("/api/pro/earnings").then((r) => r.json()),
+        authFetch("/api/pro/stats").then((r) => r.json()),
+        authFetch("/api/pro/missions").then((r) => r.json()),
+        authFetch("/api/pro/earnings").then((r) => r.json()),
       ]);
 
       if (resStats.success && resStats.stats) {
@@ -219,7 +220,7 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
     const newStatus = !profile.isOnline;
     setProfile((prev) => ({ ...prev, isOnline: newStatus }));
     try {
-      await fetch("/api/pro/profile", {
+      await authFetch("/api/pro/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isOnline: newStatus }),
@@ -239,7 +240,7 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
   const handleAcceptMission = async (missionId: string) => {
     setActionLoading(missionId);
     try {
-      const res = await fetch(`/api/pro/missions/${missionId}/accept`, {
+      const res = await authFetch(`/api/pro/missions/${missionId}/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ proName: profile.fullName }),
@@ -270,7 +271,7 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
   ) => {
     setActionLoading(missionId);
     try {
-      const res = await fetch(`/api/pro/missions/${missionId}/status`, {
+      const res = await authFetch(`/api/pro/missions/${missionId}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -300,7 +301,7 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
     if (!closingMission) return;
     setActionLoading(closingMission.id);
     try {
-      const res = await fetch(`/api/pro/missions/${closingMission.id}/status`, {
+      const res = await authFetch(`/api/pro/missions/${closingMission.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -353,7 +354,7 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
     setPayoutStep("processing");
 
     try {
-      const res = await fetch("/api/pro/payouts/request", {
+      const res = await authFetch("/api/pro/payouts/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -388,7 +389,7 @@ export const ProDashboardView: React.FC<ProDashboardViewProps> = ({
     e.preventDefault();
     setProfileSaving(true);
     try {
-      const res = await fetch("/api/pro/profile", {
+      const res = await authFetch("/api/pro/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profile),

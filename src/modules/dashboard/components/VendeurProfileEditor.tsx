@@ -22,6 +22,8 @@ import {
 import { store } from "../../../database/store";
 import { BRAND_CONFIG } from "../../../config/constants";
 import { uploadToCloudinary } from "../../../lib/cloudinary";
+import { useDialog } from "../../../shared/components/CustomDialog";
+import { authFetch } from "../../../lib/authFetch";
 
 const VENDEUR_CATEGORIES = [
   "Kits Solaires & Onduleurs Hybrides",
@@ -62,6 +64,7 @@ export const VendeurProfileEditor: React.FC<VendeurProfileEditorProps> = ({ curr
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const { openDialog, dialog } = useDialog();
 
   const handleAddGuarantee = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +89,12 @@ export const VendeurProfileEditor: React.FC<VendeurProfileEditorProps> = ({ curr
         setLogo(result.secure_url);
       }
     } catch {
-      alert("Erreur lors de l'upload du logo boutique.");
+      openDialog({
+        type: "alert",
+        title: "Erreur d'upload",
+        message: "Erreur lors de l'upload du logo de la boutique sur Cloudinary.",
+        danger: true,
+      });
     } finally {
       setIsUploading(false);
     }
@@ -118,7 +126,7 @@ export const VendeurProfileEditor: React.FC<VendeurProfileEditorProps> = ({ curr
     };
 
     try {
-      await fetch("/api/vendeur/profile", {
+      await authFetch("/api/vendeur/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -135,6 +143,7 @@ export const VendeurProfileEditor: React.FC<VendeurProfileEditorProps> = ({ curr
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      {dialog}
       {/* Header Info & Sync Status */}
       <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-2">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">

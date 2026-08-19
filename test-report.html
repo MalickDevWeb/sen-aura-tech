@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>SEN AURA TECH - Test Global API</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .subtitle { color: #94a3b8; margin-bottom: 2rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.25rem; }
+    .card h3 { margin: 0 0 0.5rem; font-size: 0.875rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    .card .value { font-size: 2rem; font-weight: 700; }
+    .ok { color: #4ade80; } .fail { color: #f87171; } .warn { color: #facc15; } .neutral { color: #94a3b8; }
+    .section { margin-bottom: 2rem; }
+    .section h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #f1f5f9; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #334155; }
+    th { color: #94a3b8; font-weight: 600; }
+    .badge { padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge.ok { background: #14532d; color: #4ade80; }
+    .badge.warn { background: #713f12; color: #facc15; }
+    .badge.fail { background: #7f1d1d; color: #f87171; }
+    .badge.neutral { background: #334155; color: #e2e8f0; }
+    .bar { background: #334155; border-radius: 999px; height: 8px; width: 100%; overflow: hidden; margin-top: 0.5rem; position: relative; }
+    .fill { height: 100%; border-radius: 999px; background: #4ade80; transition: width 0.3s; }
+    .fill.slow { background: #f87171; }
+    .bar .label { position: absolute; right: 0; top: -18px; font-size: 0.75rem; color: #94a3b8; }
+    .recommendations { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.25rem; }
+    .recommendations ul { margin: 0.5rem 0 0 1.25rem; padding: 0; }
+    .recommendations li { margin-bottom: 0.5rem; line-height: 1.5; }
+    .timestamp { color: #64748b; font-size: 0.8rem; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>SEN AURA TECH - Test Global API</h1>
+  <p class="subtitle">Rapport automatique généré le 19/08/2026 12:29:38 • Serveur: http://localhost:3000</p>
+
+  <div class="grid">
+    <div class="card"><h3>Total endpoints</h3><div class="value">70</div></div>
+    <div class="card"><h3>Succès</h3><div class="value ok">57 <small style="font-size:0.9rem;color:#94a3b8">(81%)</small></div></div>
+    <div class="card"><h3>Échecs</h3><div class="value fail">13</div></div>
+    <div class="card"><h3>Temps moyen</h3><div class="value">72<small style="font-size:0.9rem;color:#94a3b8">ms</small></div></div>
+    <div class="card"><h3>Max</h3><div class="value">728<small style="font-size:0.9rem;color:#94a3b8">ms</small></div></div>
+    <div class="card"><h3>Lents (>1s)</h3><div class="value ok">0</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Par catégorie</h2>
+    <table>
+      <tr><th>Catégorie</th><th>Total</th><th>Succès</th><th>Moyenne</th><th>Max</th></tr>
+      
+        <tr>
+          <td>System</td>
+          <td>1</td>
+          <td class="ok">1</td>
+          <td>171ms</td>
+          <td><div class="bar"><div class="fill " style="width:21.375%"></div><span class="label">171ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>Auth</td>
+          <td>1</td>
+          <td class="ok">1</td>
+          <td>180ms</td>
+          <td><div class="bar"><div class="fill " style="width:22.5%"></div><span class="label">180ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>Public</td>
+          <td>16</td>
+          <td class="ok">16</td>
+          <td>163ms</td>
+          <td><div class="bar"><div class="fill slow" style="width:79.25%"></div><span class="label">634ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>Admin</td>
+          <td>35</td>
+          <td class="ok">35</td>
+          <td>7ms</td>
+          <td><div class="bar"><div class="fill " style="width:5%"></div><span class="label">12ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>DB</td>
+          <td>8</td>
+          <td class="ok">4</td>
+          <td>216ms</td>
+          <td><div class="bar"><div class="fill slow" style="width:91%"></div><span class="label">728ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>Trainer</td>
+          <td>5</td>
+          <td class="ok">0</td>
+          <td>6ms</td>
+          <td><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>Programs</td>
+          <td>1</td>
+          <td class="ok">0</td>
+          <td>6ms</td>
+          <td><div class="bar"><div class="fill " style="width:5%"></div><span class="label">6ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>Content</td>
+          <td>3</td>
+          <td class="ok">0</td>
+          <td>7ms</td>
+          <td><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Endpoints lents (>500ms)</h2>
+    <table>
+      <tr><th>Endpoint</th><th>Catégorie</th><th>Status</th><th>Performance</th></tr>
+      
+        <tr>
+          <td>GET /api/db/courses</td>
+          <td>DB</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill slow" style="width:91%"></div><span class="label">728ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>POST /api/db/products</td>
+          <td>DB</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill slow" style="width:79.625%"></div><span class="label">637ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>GET /api/courses</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill slow" style="width:79.25%"></div><span class="label">634ms</span></div></td>
+        </tr>
+      
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Échecs inattendus</h2>
+    
+      <table>
+        <tr><th>Endpoint</th><th>Status</th><th>Temps</th></tr>
+        
+          <tr><td>GET /api/db/quotes</td><td class="fail">429</td><td>8ms</td></tr>
+        
+          <tr><td>POST /api/db/quotes</td><td class="fail">429</td><td>5ms</td></tr>
+        
+          <tr><td>GET /api/db/orders</td><td class="fail">429</td><td>7ms</td></tr>
+        
+          <tr><td>POST /api/db/orders</td><td class="fail">429</td><td>7ms</td></tr>
+        
+          <tr><td>GET /api/trainer/stats</td><td class="fail">429</td><td>5ms</td></tr>
+        
+          <tr><td>GET /api/trainer/courses</td><td class="fail">429</td><td>8ms</td></tr>
+        
+          <tr><td>POST /api/trainer/courses</td><td class="fail">429</td><td>6ms</td></tr>
+        
+          <tr><td>GET /api/trainer/students</td><td class="fail">429</td><td>5ms</td></tr>
+        
+          <tr><td>POST /api/trainer/students/enroll</td><td class="fail">429</td><td>6ms</td></tr>
+        
+          <tr><td>POST /api/programs</td><td class="fail">429</td><td>6ms</td></tr>
+        
+          <tr><td>POST /api/solutions</td><td class="fail">429</td><td>7ms</td></tr>
+        
+          <tr><td>POST /api/challenges</td><td class="fail">429</td><td>8ms</td></tr>
+        
+          <tr><td>POST /api/publications</td><td class="fail">429</td><td>5ms</td></tr>
+        
+      </table>
+    
+  </div>
+
+  <div class="section">
+    <h2>Détail complet</h2>
+    <table>
+      <tr><th>#</th><th>Endpoint</th><th>Catégorie</th><th>Status</th><th>Performance</th></tr>
+      
+        <tr>
+          <td>1</td>
+          <td>GET /api/health</td>
+          <td>System</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:21.375%"></div><span class="label">171ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>2</td>
+          <td>POST /api/auth/login (bad pw)</td>
+          <td>Auth</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:22.5%"></div><span class="label">180ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>3</td>
+          <td>GET /api/services</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:10.375%"></div><span class="label">83ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>4</td>
+          <td>GET /api/pros</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">7ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>5</td>
+          <td>GET /api/products</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:20%"></div><span class="label">160ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>6</td>
+          <td>GET /api/courses</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill slow" style="width:79.25%"></div><span class="label">634ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>7</td>
+          <td>GET /api/quotes</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:20.625%"></div><span class="label">165ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>8</td>
+          <td>GET /api/orders</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:21.75%"></div><span class="label">174ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>9</td>
+          <td>GET /api/bookings</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">28ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>10</td>
+          <td>GET /api/programs</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:21.625%"></div><span class="label">173ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>11</td>
+          <td>GET /api/solutions</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:21.5%"></div><span class="label">172ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>12</td>
+          <td>GET /api/challenges</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:21%"></div><span class="label">168ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>13</td>
+          <td>GET /api/publications</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:21.875%"></div><span class="label">175ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>14</td>
+          <td>GET /api/ambassadors/applications</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:20.5%"></div><span class="label">164ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>15</td>
+          <td>GET /api/ambassadors/leaderboard</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">12ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>16</td>
+          <td>GET /api/certificates</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:20.875%"></div><span class="label">167ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>17</td>
+          <td>GET /api/invoices/INV-TEST</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:20.875%"></div><span class="label">167ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>18</td>
+          <td>GET /api/certificates/verify/CERT-TEST</td>
+          <td>Public</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:20.5%"></div><span class="label">164ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>19</td>
+          <td>GET /api/admin/stats (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">6ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>20</td>
+          <td>GET /api/admin/users (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">10ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>21</td>
+          <td>POST /api/admin/users (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">11ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>22</td>
+          <td>PUT /api/admin/users/USR-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>23</td>
+          <td>DELETE /api/admin/users/USR-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">9ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>24</td>
+          <td>GET /api/admin/products (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">11ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>25</td>
+          <td>POST /api/admin/products (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>26</td>
+          <td>PUT /api/admin/products/PROD-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>27</td>
+          <td>DELETE /api/admin/products/PROD-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">7ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>28</td>
+          <td>GET /api/admin/courses (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">4ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>29</td>
+          <td>POST /api/admin/courses (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>30</td>
+          <td>PUT /api/admin/courses/CRS-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">11ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>31</td>
+          <td>DELETE /api/admin/courses/CRS-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">10ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>32</td>
+          <td>GET /api/admin/quotes (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>33</td>
+          <td>POST /api/admin/quotes (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>34</td>
+          <td>PUT /api/admin/quotes/QUOTE-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>35</td>
+          <td>DELETE /api/admin/quotes/QUOTE-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>36</td>
+          <td>GET /api/admin/orders (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>37</td>
+          <td>PUT /api/admin/orders/ORD-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>38</td>
+          <td>DELETE /api/admin/orders/ORD-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">3ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>39</td>
+          <td>GET /api/admin/partners (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">4ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>40</td>
+          <td>PUT /api/admin/partners/PRT-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>41</td>
+          <td>DELETE /api/admin/partners/PRT-TEST (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">4ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>42</td>
+          <td>GET /api/admin/missions (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>43</td>
+          <td>POST /api/admin/missions (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>44</td>
+          <td>GET /api/admin/logs (no auth)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>45</td>
+          <td>GET /api/admin/stats (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">10ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>46</td>
+          <td>GET /api/admin/users (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">12ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>47</td>
+          <td>GET /api/admin/products (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">9ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>48</td>
+          <td>GET /api/admin/courses (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">10ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>49</td>
+          <td>GET /api/admin/quotes (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">6ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>50</td>
+          <td>GET /api/admin/orders (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">9ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>51</td>
+          <td>GET /api/admin/partners (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">6ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>52</td>
+          <td>GET /api/admin/missions (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">10ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>53</td>
+          <td>GET /api/admin/logs (client token)</td>
+          <td>Admin</td>
+          <td><span class="badge warn">SECURE</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">6ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>54</td>
+          <td>GET /api/db/products</td>
+          <td>DB</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:20.75%"></div><span class="label">166ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>55</td>
+          <td>POST /api/db/products</td>
+          <td>DB</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill slow" style="width:79.625%"></div><span class="label">637ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>56</td>
+          <td>GET /api/db/courses</td>
+          <td>DB</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill slow" style="width:91%"></div><span class="label">728ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>57</td>
+          <td>POST /api/db/courses</td>
+          <td>DB</td>
+          <td><span class="badge ok">OK</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:21%"></div><span class="label">168ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>58</td>
+          <td>GET /api/db/quotes</td>
+          <td>DB</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>59</td>
+          <td>POST /api/db/quotes</td>
+          <td>DB</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>60</td>
+          <td>GET /api/db/orders</td>
+          <td>DB</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">7ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>61</td>
+          <td>POST /api/db/orders</td>
+          <td>DB</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">7ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>62</td>
+          <td>GET /api/trainer/stats</td>
+          <td>Trainer</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>63</td>
+          <td>GET /api/trainer/courses</td>
+          <td>Trainer</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>64</td>
+          <td>POST /api/trainer/courses</td>
+          <td>Trainer</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">6ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>65</td>
+          <td>GET /api/trainer/students</td>
+          <td>Trainer</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>66</td>
+          <td>POST /api/trainer/students/enroll</td>
+          <td>Trainer</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">6ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>67</td>
+          <td>POST /api/programs</td>
+          <td>Programs</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">6ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>68</td>
+          <td>POST /api/solutions</td>
+          <td>Content</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">7ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>69</td>
+          <td>POST /api/challenges</td>
+          <td>Content</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">8ms</span></div></td>
+        </tr>
+      
+        <tr>
+          <td>70</td>
+          <td>POST /api/publications</td>
+          <td>Content</td>
+          <td><span class="badge fail">CLIENT</span></td>
+          <td style="min-width:200px"><div class="bar"><div class="fill " style="width:5%"></div><span class="label">5ms</span></div></td>
+        </tr>
+      
+    </table>
+  </div>
+
+  <div class="section recommendations">
+    <h2>Recommandations</h2>
+    <ul>
+      <li><strong>Cache :</strong> Aucun endpoint critique lent, mais un cache sur /api/health et /api/trainer/stats reste utile.</li>
+      <li><strong>Pagination :</strong> ajouter une pagination sur les listings volumineux pour réduire la latence.</li>
+      <li><strong>Index DB :</strong> vérifier les index sur status, category, created_at.</li>
+      <li><strong>Rate limiting :</strong> passer à un rate limiter par utilisateur auth plutôt que par IP.</li>
+      <li><strong>Sécurité :</strong> aucun endpoint admin non auth détecté dans ce test.</li>
+      <li><strong>Validation :</strong> couvrir plus de routes par Zod pour éviter les spreads inutiles.</li>
+    </ul>
+  </div>
+
+  <p class="timestamp">Généré par test_global_e2e.cjs • 2026-08-19T12:29:38.794Z</p>
+</body>
+</html>

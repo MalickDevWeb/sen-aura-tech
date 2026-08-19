@@ -19,6 +19,10 @@ export async function initializeDatabase(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       try {
+        // 0. Create Sequences for guaranteed unique, incrementing IDs
+        await sql`CREATE SEQUENCE IF NOT EXISTS sat_quotes_seq START 1;`;
+        await sql`CREATE SEQUENCE IF NOT EXISTS sat_orders_seq START 1;`;
+
         // 1. Users with unique constraints on phone & email
         await sql`
           CREATE TABLE IF NOT EXISTS sat_users (
@@ -32,6 +36,7 @@ export async function initializeDatabase(): Promise<void> {
             verified BOOLEAN DEFAULT false,
             status VARCHAR(50) DEFAULT 'ACTIF',
             data JSONB,
+            password_hash TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
           )
@@ -429,6 +434,18 @@ export async function initializeDatabase(): Promise<void> {
             key VARCHAR(100) PRIMARY KEY,
             config_json JSONB NOT NULL,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+
+        // 13. Security & Pare-Feu (IP Blocklist)
+        await sql`
+          CREATE TABLE IF NOT EXISTS sat_blocked_ips (
+            ip_address VARCHAR(100) PRIMARY KEY,
+            reason VARCHAR(255),
+            attempts INT DEFAULT 0,
+            status VARCHAR(50) DEFAULT 'BLOCKED',
+            unlocks_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
           )
         `;
 

@@ -14,6 +14,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { SocialPillsBar } from "./SocialCommunityPills";
+import { useDialog } from "./CustomDialog";
+import { authFetch } from "../../lib/authFetch";
 
 interface CvSubmissionModalProps {
   isOpen: boolean;
@@ -31,6 +33,7 @@ export const CvSubmissionModal: React.FC<CvSubmissionModalProps> = ({ isOpen, on
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const { openDialog, dialog } = useDialog();
 
   useEffect(() => {
     if (isOpen) {
@@ -67,7 +70,11 @@ export const CvSubmissionModal: React.FC<CvSubmissionModalProps> = ({ isOpen, on
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !email || !phone) {
-      alert("Veuillez renseigner votre nom complet, votre email et votre numéro WhatsApp.");
+      openDialog({
+        type: "alert",
+        title: "Champs obligatoires",
+        message: "Veuillez renseigner votre nom complet, votre email et votre numéro WhatsApp.",
+      });
       return;
     }
 
@@ -86,7 +93,7 @@ export const CvSubmissionModal: React.FC<CvSubmissionModalProps> = ({ isOpen, on
         submittedAt: new Date().toISOString(),
       };
 
-      await fetch("/api/community/cv-submission", {
+      await authFetch("/api/community/cv-submission", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -120,6 +127,7 @@ export const CvSubmissionModal: React.FC<CvSubmissionModalProps> = ({ isOpen, on
       data-lenis-prevent="true"
       className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 select-none overflow-hidden"
     >
+      {dialog}
       <div
         id="cv-modal-card"
         data-lenis-prevent="true"

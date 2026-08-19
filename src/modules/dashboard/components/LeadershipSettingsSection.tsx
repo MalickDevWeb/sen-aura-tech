@@ -16,9 +16,12 @@ import {
   EyeOff,
   Sparkles,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { uploadToCloudinary } from "../../../lib/cloudinary";
+import { useDialog } from "../../../shared/components/CustomDialog";
 import {
   SystemConfig,
   TeamMemberItem,
@@ -46,6 +49,10 @@ export const LeadershipSettingsSection: React.FC<LeadershipSettingsSectionProps>
   const [editingMember, setEditingMember] = useState<TeamMemberItem | null>(null);
   const [isNewMember, setIsNewMember] = useState<boolean>(false);
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadStage, setUploadStage] = useState<string>("");
+  const { openDialog, dialog } = useDialog();
 
   const handleUpdateLeadership = (partial: Partial<typeof leadership>) => {
     onChange({
@@ -80,8 +87,16 @@ export const LeadershipSettingsSection: React.FC<LeadershipSettingsSectionProps>
     setShowModal(true);
   };
 
-  const handleDeleteMember = (id: string) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer ce membre de l'équipe ?")) {
+  const handleDeleteMember = async (id: string) => {
+    const res = await openDialog({
+      type: "confirm",
+      title: "Supprimer le membre",
+      message: "Êtes-vous sûr de vouloir supprimer ce membre de l'équipe ?",
+      danger: true,
+      confirmLabel: "Supprimer",
+    });
+    
+    if (res !== undefined) {
       const updated = leadership.items.filter((m) => m.id !== id);
       handleUpdateLeadership({ items: updated });
     }
@@ -97,7 +112,11 @@ export const LeadershipSettingsSection: React.FC<LeadershipSettingsSectionProps>
   const handleSaveMember = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember || !editingMember.name.trim() || !editingMember.role.trim()) {
-      alert("Veuillez renseigner au moins le nom et le rôle du membre.");
+      openDialog({
+        type: "alert",
+        title: "Champs obligatoires",
+        message: "Veuillez renseigner au moins le nom et le rôle du membre.",
+      });
       return;
     }
 
@@ -118,24 +137,49 @@ export const LeadershipSettingsSection: React.FC<LeadershipSettingsSectionProps>
     setEditingMember(null);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editingMember) return;
 
-    // Check size limit (max 2MB for base64 storage)
-    if (file.size > 2 * 1024 * 1024) {
-      alert("La photo est trop lourde (max 2 Mo). Veuillez choisir une photo plus légère.");
+    // Check size limit (max 10MB for Cloudinary)
+    if (file.size > 10 * 1024 * 1024) {
+      openDialog({
+        type: "alert",
+        title: "Fichier trop volumineux",
+        message: "La photo est trop lourde (max 10 Mo). Veuillez choisir une photo plus légère.",
+      });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (base64) {
-        setEditingMember({ ...editingMember, avatar: base64 });
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStage("Préparation...");
+
+    try {
+      const result = await uploadToCloudinary(file, "sen_aura_tech_leadership", "image", (percent, stage) => {
+        setUploadProgress(percent);
+        setUploadStage(stage);
+      });
+
+      if (result.success) {
+        setEditingMember({ ...editingMember, avatar: result.secure_url });
+      } else {
+        throw new Error("Upload échoué sans exception");
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error(err);
+      openDialog({
+        type: "alert",
+        title: "Erreur d'upload",
+        message: "Impossible d'importer l'image sur Cloudinary. Veuillez réessayer.",
+        danger: true,
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      // Reset l'input file pour permettre de re-sélectionner le même fichier au besoin
+      e.target.value = "";
+    }
   };
 
   const handleMoveOrder = (index: number, direction: "up" | "down") => {
@@ -157,6 +201,7 @@ export const LeadershipSettingsSection: React.FC<LeadershipSettingsSectionProps>
 
   return (
     <div className="space-y-6">
+      {dialog}
       {/* SECTION HEADER */}
       <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -394,14 +439,24 @@ export const LeadershipSettingsSection: React.FC<LeadershipSettingsSectionProps>
                       </p>
 
                       <div className="flex flex-wrap gap-2 pt-1">
-                        <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-bold flex items-center gap-1.5 shadow-sm">
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Importer photo locale</span>
+                        <label className={`cursor-pointer px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 shadow-sm transition-all ${isUploading ? "bg-slate-800 text-slate-400 pointer-events-none" : "bg-amber-500 hover:bg-amber-400 text-slate-950"}`}>
+                          {isUploading ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>{uploadProgress}% • {uploadStage}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Importer photo locale (max 10 Mo)</span>
+                            </>
+                          )}
                           <input
                             type="file"
                             accept="image/*"
                             onChange={handleFileUpload}
                             className="hidden"
+                            disabled={isUploading}
                           />
                         </label>
                       </div>

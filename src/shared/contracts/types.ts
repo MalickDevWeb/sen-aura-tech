@@ -138,6 +138,7 @@ export interface UserDTO {
   trialExpiresAt?: string;
   proFreeTrialActive?: boolean;
   createdAt: string;
+  passwordHash?: string;
 }
 
 export type PoleType = 

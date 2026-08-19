@@ -57,6 +57,7 @@ import { store } from "./database/store";
 import { PoleType, QuoteRequestDTO } from "./shared/contracts/types";
 import { SmoothScrollProvider } from "./lib/smooth-scroll";
 import { MaintenancePage } from "./shared/components/MaintenancePage";
+import { MaintenanceControlPanel } from "./shared/components/MaintenanceControlPanel";
 import { useSystemConfig } from "./config/system-config";
 import { NotFoundPage } from "./shared/components/NotFoundPage";
 
@@ -91,6 +92,9 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState<boolean>(false);
   const [invoiceModalData, setInvoiceModalData] = useState<Partial<InvoiceData> | undefined>(undefined);
+  // Track if the user arrived via /maintenance_sat
+  const [isMaintenanceRoute, setIsMaintenanceRoute] = useState<boolean>(false);
+  const [showMaintenancePanel, setShowMaintenancePanel] = useState<boolean>(false);
 
   // Expose global open method for Official Invoice Modal
   useEffect(() => {
@@ -112,8 +116,9 @@ export default function App() {
     
     // Admin Backdoor (Strict: /maintenance_sat)
     if (window.location.pathname === "/maintenance_sat" || window.location.search.includes("maintenance_sat")) {
+      setIsMaintenanceRoute(true);
       setIsAuthModalOpen(true);
-      // Clean up the URL to prevent re-triggering if they refresh
+      // Clean up the URL
       window.history.replaceState({}, "", "/");
     }
 
@@ -142,7 +147,11 @@ export default function App() {
 
     const unsub1 = eventBus.subscribe("QUOTE_CREATED", () => {});
     const unsub2 = eventBus.subscribe(EVENTS.ROLE_CHANGED, () => {
-      if (!store.isLoggedIn) {
+      if (store.isLoggedIn) {
+        // User just logged in → go to dashboard
+        setActiveTab("dashboard");
+      } else {
+        // User logged out → go to home
         setActiveTab("home");
       }
     });
@@ -164,6 +173,12 @@ export default function App() {
   };
 
   const handleAuthSuccess = () => {
+    // If user came from /maintenance_sat, show control panel only
+    if (isMaintenanceRoute) {
+      setShowMaintenancePanel(true);
+      return;
+    }
+
     // Check if there is a pending quote draft waiting for authentication
     const draft = store.getQuoteDraft();
     if (draft && draft.serviceTitle) {
@@ -188,13 +203,25 @@ export default function App() {
 
       store.addQuote(completedQuote);
       store.clearQuoteDraft();
-      alert(`✓ Votre demande de devis (${generatedId}) a été automatiquement transmise et enregistrée sous votre compte !`);
     }
 
     setActiveTab("dashboard");
   };
 
   const isBackoffice = activeTab === "dashboard";
+
+  // --- MAINTENANCE CONTROL PANEL (after admin login from /maintenance_sat) ---
+  if (showMaintenancePanel && store.isLoggedIn && store.currentUser.role === "ADMIN") {
+    return (
+      <MaintenanceControlPanel
+        onExitToSite={() => {
+          setShowMaintenancePanel(false);
+          setIsMaintenanceRoute(false);
+          setActiveTab("dashboard");
+        }}
+      />
+    );
+  }
 
   // --- MAINTENANCE MODE INTERCEPTOR ---
   if (config.security.maintenanceMode && (!store.isLoggedIn || store.currentUser.role !== "ADMIN")) {

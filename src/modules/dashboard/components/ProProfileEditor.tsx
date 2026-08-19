@@ -22,6 +22,8 @@ import { formatCurrency, BRAND_CONFIG } from "../../../config/constants";
 import { ProfessionalDTO } from "../../../shared/contracts/types";
 
 import { uploadToCloudinary } from "../../../lib/cloudinary";
+import { useDialog } from "../../../shared/components/CustomDialog";
+import { authFetch } from "../../../lib/authFetch";
 
 const CATEGORIES = [
   "Réseau & Fibre",
@@ -73,6 +75,7 @@ export const ProProfileEditor: React.FC<ProProfileEditorProps> = ({ currency, on
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const { openDialog, dialog } = useDialog();
 
   const handleAddSkill = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +100,12 @@ export const ProProfileEditor: React.FC<ProProfileEditorProps> = ({ currency, on
         setAvatar(result.secure_url);
       }
     } catch {
-      alert("Erreur lors de l'upload de la photo.");
+      openDialog({
+        type: "alert",
+        title: "Erreur d'upload",
+        message: "Erreur lors de l'upload de la photo de profil sur Cloudinary.",
+        danger: true,
+      });
     } finally {
       setIsUploading(false);
     }
@@ -143,7 +151,7 @@ export const ProProfileEditor: React.FC<ProProfileEditorProps> = ({ currency, on
 
     // 3. Sync to backend API in real time
     try {
-      await fetch("/api/pro/profile", {
+      await authFetch("/api/pro/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,7 +160,7 @@ export const ProProfileEditor: React.FC<ProProfileEditorProps> = ({ currency, on
         }),
       });
 
-      await fetch("/api/db/providers/sync", {
+      await authFetch("/api/db/providers/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -171,6 +179,7 @@ export const ProProfileEditor: React.FC<ProProfileEditorProps> = ({ currency, on
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      {dialog}
       {/* Header Info & Sync Status */}
       <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-2">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">

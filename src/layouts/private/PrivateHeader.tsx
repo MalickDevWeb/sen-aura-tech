@@ -27,6 +27,7 @@ import { store } from "../../database/store";
 import { eventBus, EVENTS } from "../../shared/events/event-bus";
 import { UserRole } from "../../shared/contracts/types";
 import { BrandLogo } from "../../shared/components/BrandLogo";
+import { authFetch } from "../../lib/authFetch";
 
 interface PrivateHeaderProps {
   onNavigateToPublic: () => void;
@@ -77,7 +78,7 @@ export const PrivateHeader: React.FC<PrivateHeaderProps> = ({
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`/api/search/fast?q=${encodeURIComponent(searchQuery.trim())}`);
+        const res = await authFetch(`/api/search/fast?q=${encodeURIComponent(searchQuery.trim())}`);
         const data = await res.json();
         if (data && data.results) {
           setSearchResults(data.results);
@@ -168,7 +169,7 @@ export const PrivateHeader: React.FC<PrivateHeaderProps> = ({
         <div className="flex items-center gap-3 lg:gap-4 flex-1">
           <div className="flex items-center gap-2 shrink-0">
             <BrandLogo variant="horizontal" size="sm" showTagline={false} />
-            <span className={`hidden md:inline-block px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border ${getRoleBadgeColor(user.role)}`}>
+            <span className={`hidden md:inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border ${getRoleBadgeColor(user.role)}`}>
               {getRoleLabel(user.role).toUpperCase()}
             </span>
           </div>
@@ -337,7 +338,7 @@ export const PrivateHeader: React.FC<PrivateHeaderProps> = ({
                 {(user?.fullName || "Utilisateur").charAt(0).toUpperCase()}
               </div>
               <div className="hidden lg:block space-y-0.5">
-                <p className="text-xs font-bold text-white truncate max-w-[120px] leading-tight">{user?.fullName || "Utilisateur"}</p>
+                <p className="text-xs font-bold text-white truncate max-w-[200px] leading-tight">{user?.fullName || "Utilisateur"}</p>
                 <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold border ${getRoleBadgeColor(user.role)}`}>
                   {getRoleLabel(user.role)}
                 </span>

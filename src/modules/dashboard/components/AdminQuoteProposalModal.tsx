@@ -18,6 +18,7 @@ import { QuoteRequestDTO, QuoteItemDTO } from "../../../shared/contracts/types";
 import { formatCurrency } from "../../../config/constants";
 import { exportQuotePDF } from "../../../lib/pdfGenerator";
 import { store } from "../../../database/store";
+import { useDialog } from "../../../shared/components/CustomDialog";
 
 interface AdminQuoteProposalModalProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export const AdminQuoteProposalModal: React.FC<AdminQuoteProposalModalProps> = (
   const [assignedExpert, setAssignedExpert] = useState<string>("");
   const [items, setItems] = useState<QuoteItemDTO[]>([]);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const { openDialog, dialog } = useDialog();
 
   useEffect(() => {
     if (isOpen && quote) {
@@ -163,7 +165,11 @@ export const AdminQuoteProposalModal: React.FC<AdminQuoteProposalModalProps> = (
       onPublish(updatedQuote);
       setIsPublishing(false);
       onClose();
-      alert(`✓ Devis ${quote.id} validé et proposition commerciale publiée ! Le client peut désormais télécharger son devis PDF officiel.`);
+      openDialog({
+        type: "alert",
+        title: "Devis publié avec succès !",
+        message: `Devis ${quote.id} validé et proposition commerciale publiée. Le client peut désormais télécharger son devis PDF officiel.`,
+      });
     } catch {
       setIsPublishing(false);
       onPublish(updatedQuote);
@@ -200,6 +206,7 @@ export const AdminQuoteProposalModal: React.FC<AdminQuoteProposalModalProps> = (
       data-lenis-prevent="true"
       className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 select-none overflow-hidden"
     >
+      {dialog}
       <div
         id="admin-quote-proposal-modal-card"
         data-lenis-prevent="true"

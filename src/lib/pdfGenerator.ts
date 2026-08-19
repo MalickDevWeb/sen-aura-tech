@@ -288,7 +288,7 @@ export async function downloadElementAsPNG(
       return true;
     } catch (fallbackErr) {
       console.error("Failed to download element as PNG:", fallbackErr);
-      alert("Erreur lors de la génération de l'image PNG.");
+      console.error("Erreur lors de la génération de l'image PNG.");
       return false;
     }
   }
@@ -581,7 +581,7 @@ export function generateGenericPDF(
     pdf.save(safeFileName);
   } catch (err) {
     console.error("Error generating generic PDF:", err);
-    alert("Impossible de générer le fichier PDF. Veuillez réessayer.");
+    console.error("Impossible de générer le fichier PDF. Veuillez réessayer.");
   }
 }
 
@@ -1197,7 +1197,7 @@ export function exportInvoicePDF(invoice: PDFInvoiceData, fileName?: string) {
     return true;
   } catch (err) {
     console.error("Error exporting invoice PDF:", err);
-    alert("Erreur lors de l'exportation du document en PDF.");
+    console.error("Erreur lors de l'exportation du document en PDF.");
     return false;
   }
 }
@@ -1626,7 +1626,7 @@ export function exportQuotePDF(quote: PDFQuoteData, fileName?: string) {
     return true;
   } catch (err) {
     console.error("Error exporting quote PDF:", err);
-    alert("Erreur lors de l'exportation du devis en PDF.");
+    console.error("Erreur lors de l'exportation du devis en PDF.");
     return false;
   }
 }
@@ -1964,7 +1964,7 @@ export function generateOfficialPresentationPDF(fileName = "presentation-officie
     return true;
   } catch (err) {
     console.error("Error generating official presentation PDF:", err);
-    alert("Erreur lors de la génération de la présentation officielle PDF.");
+    console.error("Erreur lors de la génération de la présentation officielle PDF.");
     return false;
   }
 }

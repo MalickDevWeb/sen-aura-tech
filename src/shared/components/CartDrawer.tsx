@@ -12,6 +12,8 @@ import {
   validateSenegalPhone,
   detectSenegalCarrier,
 } from "../utils/phoneValidator";
+import { useDialog } from "./CustomDialog";
+import { authFetch } from "../../lib/authFetch";
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, currenc
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [orderSuccess, setOrderSuccess] = useState<{ id: string; total: number } | null>(null);
   const [, setTick] = useState<number>(0);
+  const { openDialog, dialog } = useDialog();
 
   useEffect(() => {
     const unsub1 = eventBus.subscribe(EVENTS.PRODUCT_ADDED_TO_CART, () => setTick((t) => t + 1));
@@ -69,7 +72,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, currenc
 
     try {
       // 1. Enregistrer dans la base Neon / Backend
-      await fetch("/api/checkout/process", {
+      await authFetch("/api/checkout/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -115,12 +118,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, currenc
       redirectToWhatsAppPayment(waMessage);
     } catch (err) {
       setIsProcessing(false);
-      alert("Erreur lors de la préparation du paiement.");
+      openDialog({
+        type: "alert",
+        title: "Erreur de paiement",
+        message: "Une erreur est survenue lors de la préparation du paiement. Veuillez réessayer.",
+        danger: true,
+      });
     }
   };
 
   return createPortal(
     <>
+      {dialog}
       {orderSuccess && (
         <CelebrationOverlay
           orderId={orderSuccess.id}

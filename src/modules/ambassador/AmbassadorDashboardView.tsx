@@ -1,3 +1,4 @@
+import { authFetch } from "../../lib/authFetch";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -230,21 +231,21 @@ Portail Officiel : https://www.senauratech.com
     setIsLoadingProspects(true);
     try {
       // Prospects
-      const pRes = await fetch(`/api/ambassadors/prospects/${ambassadorCode}`);
+      const pRes = await authFetch(`/api/ambassadors/prospects/${ambassadorCode}`);
       const pData = await pRes.json();
       if (pData.success) {
         setProspects(pData.prospects);
       }
 
       // Commissions
-      const cRes = await fetch(`/api/ambassadors/commissions/${ambassadorCode}`);
+      const cRes = await authFetch(`/api/ambassadors/commissions/${ambassadorCode}`);
       const cData = await cRes.json();
       if (cData.success) {
         setCommissions(cData.commissions);
       }
 
       // Leaderboard
-      const lRes = await fetch(`/api/ambassadors/leaderboard`);
+      const lRes = await authFetch(`/api/ambassadors/leaderboard`);
       const lData = await lRes.json();
       if (lData.success) {
         setLeaderboard(lData.leaderboard);
@@ -271,7 +272,7 @@ Portail Officiel : https://www.senauratech.com
     setProspectFormConflict(null);
 
     try {
-      const res = await fetch("/api/ambassadors/prospects", {
+      const res = await authFetch("/api/ambassadors/prospects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -313,7 +314,7 @@ Portail Officiel : https://www.senauratech.com
   const handleWithdrawalRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/ambassadors/payouts/request", {
+      const res = await authFetch("/api/ambassadors/payouts/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -6,6 +6,8 @@ import { store } from "../../database/store";
 import { ProfessionalDTO } from "../../shared/contracts/types";
 import { useSWRInstant } from "../../lib/swr-cache";
 import { OptimizedImage } from "../../shared/components/OptimizedImage";
+import { useDialog } from "../../shared/components/CustomDialog";
+import { authFetch } from "../../lib/authFetch";
 
 export const MarketplaceView: React.FC<{ currency: "FCFA" | "EUR" }> = ({ currency }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("Toutes");
@@ -16,13 +18,15 @@ export const MarketplaceView: React.FC<{ currency: "FCFA" | "EUR" }> = ({ curren
   const [bookingTime, setBookingTime] = useState<string>("10:00");
   const [bookingAddress, setBookingAddress] = useState<string>("Almadies, Dakar");
   const [bookingSuccess, setBookingSuccess] = useState<string | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const { openDialog, dialog } = useDialog();
 
   // SWR Instant Cache for Pros & Providers
   const { data: pros } = useSWRInstant<ProfessionalDTO[]>(
     "marketplace_pros_list",
     async () => {
       try {
-        const res = await fetch("/api/db/providers");
+        const res = await authFetch("/api/db/providers");
         const json = await res.json();
         if (json?.providers) {
           return json.providers;
@@ -63,7 +67,7 @@ export const MarketplaceView: React.FC<{ currency: "FCFA" | "EUR" }> = ({ curren
     if (!activePro) return;
 
     try {
-      const res = await fetch("/api/marketplace/book", {
+      const res = await authFetch("/api/marketplace/book", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -104,12 +108,18 @@ export const MarketplaceView: React.FC<{ currency: "FCFA" | "EUR" }> = ({ curren
         setBookingProId(null);
       }
     } catch (err) {
-      alert("Erreur lors de la réservation.");
+      openDialog({
+        type: "alert",
+        title: "Erreur de réservation",
+        message: "Une erreur est survenue lors de la réservation. Veuillez vérifier votre connexion et réessayer.",
+        danger: true,
+      });
     }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+      {dialog}
       
       {/* Header */}
       <div className="text-center space-y-3 max-w-3xl mx-auto">

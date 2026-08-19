@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, BRAND_CONFIG } from "../../config/constants";
 import { PoleType } from "../../shared/contracts/types";
+import { useDialog } from "../../shared/components/CustomDialog";
 
 interface PartnersEcosystemViewProps {
   currency: "FCFA" | "EUR";
@@ -43,6 +44,7 @@ export const PartnersEcosystemView: React.FC<PartnersEcosystemViewProps> = ({
   onOpenQuoteModal
 }) => {
   const config = useSystemConfig();
+  const { openDialog, dialog } = useDialog();
   // Commission calculator state
   const [projectAmountFCFA, setProjectAmountFCFA] = useState<number>(500000);
   
@@ -106,6 +108,7 @@ export const PartnersEcosystemView: React.FC<PartnersEcosystemViewProps> = ({
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-100 pb-20">
+      {dialog}
       {/* HERO SECTION */}
       <section className="relative overflow-hidden pt-12 pb-20 border-b border-slate-800/80 bg-gradient-to-b from-slate-950 via-[#0B0F19] to-[#0B0F19]">
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -513,7 +516,11 @@ export const PartnersEcosystemView: React.FC<PartnersEcosystemViewProps> = ({
                 <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
                   <span className="text-[11px] font-bold text-amber-400">{lab.status}</span>
                   <button
-                    onClick={() => alert(`Projet R&D "${lab.title}" : Contactez le SEN AURA LAB pour un partenariat de test.`)}
+                    onClick={() => openDialog({
+                      type: "alert",
+                      title: `Projet R&D : ${lab.title}`,
+                      message: `Contactez le SEN AURA LAB pour un partenariat de test ou un accès bêta à ce projet.`,
+                    })}
                     className="text-slate-300 hover:text-white flex items-center gap-1 font-bold text-[11px]"
                   >
                     <span>Explorer</span>

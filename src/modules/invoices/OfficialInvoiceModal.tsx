@@ -24,6 +24,7 @@ import { generateInvoicePaymentWhatsAppMsg, redirectToWhatsAppPayment } from "..
 import { store } from "../../database/store";
 import { MessageCircle } from "lucide-react";
 import { detectDocumentContext, DocumentContextType } from "../../lib/invoiceContext";
+import { authFetch } from "../../lib/authFetch";
 
 export interface InvoiceItem {
   description: string;
@@ -153,7 +154,7 @@ export const OfficialInvoiceModal: React.FC<OfficialInvoiceModalProps> = ({
   const fetchInvoiceFromBackend = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/invoices/generate", {
+      const response = await authFetch("/api/invoices/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

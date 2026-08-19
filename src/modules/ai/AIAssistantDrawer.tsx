@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Bot, Send, Sparkles, User, FileText, ArrowRight } from "lucide-react";
 import { store } from "../../database/store";
+import { authFetch } from "../../lib/authFetch";
 
 interface AIAssistantDrawerProps {
   isOpen: boolean;
@@ -55,7 +56,7 @@ export const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({
     setLoading(true);
 
     try {
-      const res = await fetch("/api/ai/advise", {
+      const res = await authFetch("/api/ai/advise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: userText, context: "Sénégal & Afrique" }),

@@ -1,6 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
+import { z } from "zod";
 import { neonDbService } from "../src/db/neon-service";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
@@ -36,16 +37,26 @@ function verifyJwt(token: string) {
 }
 
 async function hashPassword(password: string) {
+  const salt = crypto.randomBytes(16).toString("hex");
   return new Promise<string>((resolve, reject) => {
-    crypto.scrypt(password, "senaura-salt", 64, { N: 1024 }, (err, derivedKey) => {
+    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1 }, (err, derivedKey) => {
       if (err) reject(err);
-      else resolve(derivedKey.toString("hex"));
+      else resolve(`${salt}:${derivedKey.toString("hex")}`);
     });
   });
 }
 
 async function verifyPassword(password: string, hash: string) {
-  return hashPassword(password).then((h) => h === hash);
+  if (!hash || !hash.includes(":")) return false;
+  const [salt, storedKey] = hash.split(":");
+  return new Promise<boolean>((resolve) => {
+    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1 }, (err, derivedKey) => {
+      if (err) return resolve(false);
+      const key = derivedKey.toString("hex");
+      const isMatch = key.length === storedKey.length && crypto.timingSafeEqual(Buffer.from(key), Buffer.from(storedKey));
+      resolve(isMatch);
+    });
+  });
 }
 
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -77,7 +88,304 @@ function withAdminAuth(handler: express.RequestHandler): express.RequestHandler[
   return [requireAuth, requireAdmin, handler];
 }
 
+function validateBody(schema: any) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: "Données invalides",
+        issues: result.error.issues.map((i: any) => ({ path: i.path, message: i.message })),
+      });
+    }
+    req.body = result.data;
+    next();
+  };
+}
+
+const schemas = {
+  login: z.object({
+    email: z.string().email("Email invalide"),
+    password: z.string().min(6, "Mot de passe requis"),
+  }),
+  register: z.object({
+    fullName: z.string().min(2, "Nom requis"),
+    email: z.string().email("Email invalide"),
+    phone: z.string().min(8, "Téléphone requis"),
+    role: z.enum(["CLIENT"]).default("CLIENT"),
+    city: z.string().optional(),
+    password: z.string().min(6, "Mot de passe requis"),
+  }),
+  adminUserCreate: z.object({
+    fullName: z.string().min(2, "Nom requis"),
+    email: z.string().email("Email invalide"),
+    phone: z.string().optional(),
+    role: z.enum(["CLIENT", "ADMIN", "TRAINER", "VENDOR", "PRO", "PARTNER", "AMBASSADOR"]).optional(),
+    city: z.string().optional(),
+    status: z.string().optional(),
+  }),
+  adminUserUpdate: z.object({
+    fullName: z.string().optional(),
+    email: z.string().email("Email invalide").optional(),
+    phone: z.string().optional(),
+    role: z.string().optional(),
+    city: z.string().optional(),
+    status: z.string().optional(),
+  }),
+  productCreate: z.object({
+    title: z.string().min(2, "Titre requis"),
+    name: z.string().optional(),
+    category: z.string().optional(),
+    price: z.number().positive().optional(),
+    priceFCFA: z.number().positive().optional(),
+    stock: z.number().int().nonnegative().optional(),
+    description: z.string().optional(),
+    image: z.string().url().optional(),
+    imageUrl: z.string().url().optional(),
+  }),
+  productUpdate: z.object({
+    title: z.string().optional(),
+    name: z.string().optional(),
+    category: z.string().optional(),
+    price: z.number().positive().optional(),
+    priceFCFA: z.number().positive().optional(),
+    stock: z.number().int().nonnegative().optional(),
+    status: z.string().optional(),
+    description: z.string().optional(),
+    image: z.string().url().optional(),
+    imageUrl: z.string().url().optional(),
+  }),
+  courseCreate: z.object({
+    title: z.string().min(2, "Titre requis"),
+    category: z.string().optional(),
+    price: z.number().positive().optional(),
+    priceFCFA: z.number().positive().optional(),
+    level: z.string().optional(),
+    duration: z.string().optional(),
+    description: z.string().optional(),
+    instructor: z.string().optional(),
+    formateur: z.string().optional(),
+  }),
+  courseUpdate: z.object({
+    title: z.string().optional(),
+    category: z.string().optional(),
+    price: z.number().positive().optional(),
+    priceFCFA: z.number().positive().optional(),
+    level: z.string().optional(),
+    duration: z.string().optional(),
+    description: z.string().optional(),
+    instructor: z.string().optional(),
+    formateur: z.string().optional(),
+    status: z.string().optional(),
+  }),
+  quoteCreate: z.object({
+    serviceTitle: z.string().optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    budgetFCFA: z.number().nonnegative().optional(),
+    userId: z.string().optional(),
+    userName: z.string().optional(),
+    userPhone: z.string().optional(),
+    pole: z.string().optional(),
+  }),
+  quoteUpdate: z.object({
+    status: z.string().optional(),
+    budgetFCFA: z.number().nonnegative().optional(),
+    description: z.string().optional(),
+    proposalText: z.string().optional(),
+    proposalAmountFCFA: z.number().nonnegative().optional(),
+  }),
+  checkoutProcess: z.object({
+    amount: z.number().positive("Montant invalide"),
+    method: z.string().min(2, "Méthode requise"),
+    customerInfo: z.object({
+      fullName: z.string().optional(),
+      name: z.string().optional(),
+      phone: z.string().optional(),
+      city: z.string().optional(),
+      address: z.string().optional(),
+    }).optional(),
+    items: z.array(z.any()).optional(),
+  }),
+  partnerApply: z.object({
+    name: z.string().min(2, "Nom requis"),
+    email: z.string().email("Email invalide"),
+    phone: z.string().min(8, "Téléphone requis"),
+    company: z.string().optional(),
+    domain: z.string().optional(),
+    city: z.string().optional(),
+    motivation: z.string().optional(),
+  }),
+  programCreate: z.object({
+    title: z.string().min(2, "Titre requis"),
+    slug: z.string().optional(),
+    description: z.string().optional(),
+    category: z.string().optional(),
+    status: z.string().optional(),
+    isFlagship: z.boolean().optional(),
+    isDraft: z.boolean().optional(),
+    sprintDurationDays: z.number().int().positive().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+  }),
+  programUpdate: z.object({
+    title: z.string().optional(),
+    slug: z.string().optional(),
+    description: z.string().optional(),
+    category: z.string().optional(),
+    status: z.string().optional(),
+    isFlagship: z.boolean().optional(),
+    isDraft: z.boolean().optional(),
+    sprintDurationDays: z.number().int().positive().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+  }),
+  solutionCreate: z.object({
+    programId: z.string().optional(),
+    title: z.string().min(2, "Titre requis"),
+    slug: z.string().optional(),
+    description: z.string().optional(),
+    category: z.string().optional(),
+    status: z.string().optional(),
+    sprintNumber: z.number().int().positive().optional(),
+    impactMetric: z.string().optional(),
+    metrics: z.record(z.string(), z.any()).optional(),
+    stackTech: z.array(z.string()).optional(),
+    imageUrl: z.string().url().optional(),
+    demoUrl: z.string().url().optional(),
+    isPublished: z.boolean().optional(),
+    isDraft: z.boolean().optional(),
+  }),
+  solutionUpdate: z.object({
+    programId: z.string().optional(),
+    title: z.string().optional(),
+    slug: z.string().optional(),
+    description: z.string().optional(),
+    category: z.string().optional(),
+    status: z.string().optional(),
+    sprintNumber: z.number().int().positive().optional(),
+    impactMetric: z.string().optional(),
+    metrics: z.record(z.string(), z.any()).optional(),
+    stackTech: z.array(z.string()).optional(),
+    imageUrl: z.string().url().optional(),
+    demoUrl: z.string().url().optional(),
+    isPublished: z.boolean().optional(),
+    isDraft: z.boolean().optional(),
+  }),
+  challengeCreate: z.object({
+    title: z.string().min(2, "Titre requis"),
+    description: z.string().optional(),
+    submittedByName: z.string().optional(),
+    submittedByEmail: z.string().email().optional(),
+    submittedByPhone: z.string().optional(),
+    sector: z.string().optional(),
+    city: z.string().optional(),
+    estimatedBudgetFCFA: z.number().nonnegative().optional(),
+    status: z.string().optional(),
+    isPublished: z.boolean().optional(),
+  }),
+  challengeUpdate: z.object({
+    title: z.string().optional(),
+    description: z.string().optional(),
+    submittedByName: z.string().optional(),
+    submittedByEmail: z.string().email().optional(),
+    submittedByPhone: z.string().optional(),
+    sector: z.string().optional(),
+    city: z.string().optional(),
+    estimatedBudgetFCFA: z.number().nonnegative().optional(),
+    status: z.string().optional(),
+    isPublished: z.boolean().optional(),
+  }),
+  publicationCreate: z.object({
+    title: z.string().min(2, "Titre requis"),
+    body: z.string().optional(),
+    type: z.string().optional(),
+    programId: z.string().optional(),
+    solutionId: z.string().optional(),
+    challengeId: z.string().optional(),
+    mediaUrl: z.string().url().optional(),
+    mediaType: z.string().optional(),
+    callToAction: z.string().optional(),
+    targetUrl: z.string().url().optional(),
+    isActive: z.boolean().optional(),
+    isDraft: z.boolean().optional(),
+  }),
+  publicationUpdate: z.object({
+    title: z.string().optional(),
+    body: z.string().optional(),
+    type: z.string().optional(),
+    programId: z.string().optional(),
+    solutionId: z.string().optional(),
+    challengeId: z.string().optional(),
+    mediaUrl: z.string().url().optional(),
+    mediaType: z.string().optional(),
+    callToAction: z.string().optional(),
+    targetUrl: z.string().url().optional(),
+    isActive: z.boolean().optional(),
+    isDraft: z.boolean().optional(),
+  }),
+};
+
 const app = express();
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
+
+// CORS
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) || [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://www.senauratech.com",
+  ];
+
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
+
+// Rate limiting (simple in-memory)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api")) return next();
+  
+  const key = req.ip || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxRequests = 100;
+
+  const entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+    return next();
+  }
+
+  entry.count++;
+  if (entry.count > maxRequests) {
+    return res.status(429).json({ success: false, error: "Trop de requêtes. Réessayez dans quelques minutes." });
+  }
+  next();
+});
 
 // Increase payload limits for base64 file uploads (Cloudinary, PDF, Images)
 app.use(express.json({ limit: "50mb" }));
@@ -188,7 +496,7 @@ app.get("/api/health", async (_req, res) => {
     const result = await sql`SELECT NOW() as current_time, current_database() as db_name;`;
     dbStatus = `Connected to Neon DB: ${result[0]?.db_name || "senauratech_db"}`;
   } catch (err: any) {
-    dbStatus = `Neon DB Fallback Ready (${err?.message || "initializing"})`;
+    dbStatus = "Neon DB Fallback Ready";
   }
 
   res.json({
@@ -202,7 +510,7 @@ app.get("/api/health", async (_req, res) => {
 });
 
 // Neon Database Schema Migration & Diagnostic Endpoint
-app.get("/api/db/setup", async (_req, res) => {
+app.get("/api/db/setup", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { initializeDatabase, sql } = await import("../src/db/neon.ts");
     await initializeDatabase();
@@ -219,70 +527,69 @@ app.get("/api/db/setup", async (_req, res) => {
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      error: "Erreur lors de la configuration Neon",
-      details: error?.message || String(error),
+      error: "Erreur interne du serveur",
     });
   }
 });
 
 // Neon CRUD API Endpoints (Direct Cloud SQL Access)
-app.get("/api/db/quotes", async (_req, res) => {
+app.get("/api/db/quotes", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const quotes = await neonDbService.getAllQuotes();
     res.json({ success: true, quotes });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, quotes: [] });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", quotes: [] });
   }
 });
 
-app.post("/api/db/quotes", async (req, res) => {
+app.post("/api/db/quotes", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveQuote(req.body);
     res.json({ success: true, quote: saved });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
   }
 });
 
-app.get("/api/db/bookings", async (_req, res) => {
+app.get("/api/db/bookings", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const bookings = await neonDbService.getAllBookings();
     res.json({ success: true, bookings });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, bookings: [] });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", bookings: [] });
   }
 });
 
-app.post("/api/db/bookings", async (req, res) => {
+app.post("/api/db/bookings", requireAuth, async (req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveBooking(req.body);
     res.json({ success: true, booking: saved });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
   }
 });
 
-app.get("/api/db/orders", async (_req, res) => {
+app.get("/api/db/orders", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const orders = await neonDbService.getAllOrders();
     res.json({ success: true, orders });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, orders: [] });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", orders: [] });
   }
 });
 
-app.post("/api/db/orders", async (req, res) => {
+app.post("/api/db/orders", requireAuth, async (req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveOrder(req.body);
     res.json({ success: true, order: saved });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
   }
 });
 
@@ -359,24 +666,41 @@ app.post("/api/auth/check-uniqueness", async (req, res) => {
       message: "Numéro de téléphone et email disponibles.",
     });
   } catch (err: any) {
-    res.status(500).json({ available: true, error: err?.message });
+    res.status(500).json({ available: true, error: "Erreur interne du serveur" });
   }
 });
 
+// Dual-mode: accepts JWT token (update) OR phone+PIN (first login)
 app.post("/api/db/users/sync", async (req, res) => {
   try {
-    // Accept both { user: {...} } and flat object { id, phone, role, ... }
     const user = req.body.user || (req.body.id || req.body.phone ? req.body : null);
     const pin = req.body.pin;
+
     if (!user) {
       return res.status(400).json({ success: false, error: "Données utilisateur manquantes" });
+    }
+
+    // Check if caller is already authenticated via token
+    const authHeader = (req.headers.authorization || "") as string;
+    const existingToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const callerPayload = existingToken ? verifyJwt(existingToken) : null;
+
+    // If no valid token: require phone + PIN as implicit authentication
+    if (!callerPayload) {
+      if (!user.phone || !pin) {
+        return res.status(401).json({ success: false, error: "Token ou PIN requis pour synchroniser un utilisateur." });
+      }
+      // PIN must be at least 4 digits
+      if (typeof pin !== "string" || pin.length < 4) {
+        return res.status(401).json({ success: false, error: "PIN invalide (minimum 4 chiffres)." });
+      }
     }
 
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved: any = await neonDbService.upsertUser(user, pin);
 
     if (saved && saved.duplicate) {
-      return res.status(409).json({ success: false, error: saved.error || "Utilisateur en doublon détecté" });
+      return res.json({ success: false, error: saved.error || "Utilisateur en doublon détecté", duplicate: true });
     }
 
     // Keep in-memory data synchronized
@@ -387,14 +711,30 @@ app.post("/api/db/users/sync", async (req, res) => {
       inMemoryData.users.push(user);
     }
 
-    res.json({ success: true, user: saved });
+    // Generate / refresh JWT token for the user
+    const token = callerPayload
+      ? existingToken // keep existing token if already authenticated
+      : signJwt({ sub: user.id, phone: user.phone, role: user.role || "CLIENT" });
+
+    res.json({ success: true, user: saved || user, token, existing: !!(saved && saved.existing) });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
+  }
+});
+
+
+app.get("/api/db/users", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const users = await neonDbService.getAllUsers();
+    res.json({ success: true, users });
+  } catch (err: any) {
+    res.json({ success: true, users: inMemoryData.users });
   }
 });
 
 // Products & Boutique
-app.get("/api/db/products", async (_req, res) => {
+app.get("/api/db/products", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const products = await neonDbService.getAllProducts();
@@ -407,10 +747,10 @@ app.get("/api/db/products", async (_req, res) => {
   res.json({ success: true, products: inMemoryData.products });
 });
 
-app.post("/api/db/products", async (req, res) => {
+app.post("/api/db/products", requireAuth, requireAdmin, async (req, res) => {
   try {
     const newProduct = {
-      id: req.body.id || `PROD-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: req.body.id || `PROD-${crypto.randomUUID().slice(0,8)}`,
       ...req.body,
       createdAt: req.body.createdAt || new Date().toISOString(),
     };
@@ -424,56 +764,112 @@ app.post("/api/db/products", async (req, res) => {
   }
 });
 
+app.put("/api/db/products/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const idx = inMemoryData.products.findIndex((p: any) => p.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, error: "Produit introuvable" });
+  }
+  inMemoryData.products[idx] = { ...inMemoryData.products[idx], ...req.body, updatedAt: new Date().toISOString() };
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.saveProduct(inMemoryData.products[idx]);
+  } catch (err) {}
+  res.json({ success: true, product: inMemoryData.products[idx] });
+});
+
+app.delete("/api/db/products/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const idx = inMemoryData.products.findIndex((p: any) => p.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, error: "Produit introuvable" });
+  }
+  inMemoryData.products.splice(idx, 1);
+  inMemoryData.vendorProducts = (inMemoryData.vendorProducts || []).filter((p: any) => p.id !== id);
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.deleteProduct(id);
+  } catch (err) {}
+  res.json({ success: true, message: "Produit supprimé" });
+});
+
 // Courses & Academy
-app.get("/api/db/courses", async (_req, res) => {
+app.get("/api/db/courses", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const courses = await neonDbService.getAllCourses();
     res.json({ success: true, courses });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, courses: [] });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", courses: [] });
   }
 });
 
-app.post("/api/db/courses", async (req, res) => {
+app.post("/api/db/courses", requireAuth, requireAdmin, async (req, res) => {
   try {
     const newCourse = {
-      id: req.body.id || `COURSE-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: req.body.id || `COURSE-${crypto.randomUUID().slice(0,8)}`,
       ...req.body,
       createdAt: req.body.createdAt || new Date().toISOString(),
     };
-    // Add to inMemoryData so PUT/DELETE can find it immediately
     inMemoryData.courses.unshift(newCourse);
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveCourse(newCourse);
     res.json({ success: true, course: saved || newCourse });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
   }
 });
 
+app.put("/api/db/courses/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const idx = inMemoryData.courses.findIndex((c: any) => c.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, error: "Formation introuvable" });
+  }
+  inMemoryData.courses[idx] = { ...inMemoryData.courses[idx], ...req.body, updatedAt: new Date().toISOString() };
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.saveCourse(inMemoryData.courses[idx]);
+  } catch (err) {}
+  res.json({ success: true, course: inMemoryData.courses[idx] });
+});
+
+app.delete("/api/db/courses/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const idx = inMemoryData.courses.findIndex((c: any) => c.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, error: "Formation introuvable" });
+  }
+  inMemoryData.courses.splice(idx, 1);
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.deleteCourse(id);
+  } catch (err) {}
+  res.json({ success: true, message: "Formation supprimée" });
+});
+
 // Providers & Pros
-app.get("/api/db/providers", async (_req, res) => {
+app.get("/api/db/providers", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const providers = await neonDbService.getAllProviders();
     res.json({ success: true, providers });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, providers: [] });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", providers: [] });
   }
 });
 
-app.post("/api/db/providers", async (req, res) => {
+app.post("/api/db/providers", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveProvider(req.body);
     res.json({ success: true, provider: saved });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
   }
 });
 
-app.post("/api/db/providers/sync", async (req, res) => {
+app.post("/api/db/providers/sync", requireAuth, async (req, res) => {
   try {
     const { provider } = req.body;
     if (!provider) {
@@ -487,7 +883,7 @@ app.post("/api/db/providers/sync", async (req, res) => {
   }
 });
 
-app.post("/api/pro/profile", async (req, res) => {
+app.post("/api/pro/profile", requireAuth, async (req, res) => {
   try {
     const proData = req.body;
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -498,7 +894,7 @@ app.post("/api/pro/profile", async (req, res) => {
   }
 });
 
-app.post("/api/formateur/profile", async (req, res) => {
+app.post("/api/formateur/profile", requireAuth, async (req, res) => {
   try {
     const formateurData = req.body;
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -524,7 +920,7 @@ app.post("/api/formateur/profile", async (req, res) => {
   }
 });
 
-app.post("/api/vendeur/profile", async (req, res) => {
+app.post("/api/vendeur/profile", requireAuth, async (req, res) => {
   try {
     const vendeurData = req.body;
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -551,44 +947,44 @@ app.post("/api/vendeur/profile", async (req, res) => {
 });
 
 // Leadership & Team
-app.get("/api/db/leadership", async (_req, res) => {
+app.get("/api/db/leadership", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const leadership = await neonDbService.getLeadership();
     res.json({ success: true, leadership });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, leadership: [] });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", leadership: [] });
   }
 });
 
-app.post("/api/db/leadership", async (req, res) => {
+app.post("/api/db/leadership", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveLeadershipMember(req.body);
     res.json({ success: true, leadership: saved });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
   }
 });
 
 // Global System Configuration
-app.get("/api/db/config", async (_req, res) => {
+app.get("/api/db/config", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const config = await neonDbService.getSystemConfig("default");
     res.json({ success: true, config });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, config: null });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", config: null });
   }
 });
 
-app.post("/api/db/config", async (req, res) => {
+app.post("/api/db/config", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const saved = await neonDbService.saveSystemConfig(req.body, "default");
     res.json({ success: true, config: saved });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
   }
 });
 
@@ -605,9 +1001,9 @@ app.post("/api/upload", async (req, res) => {
       (filename && (filename.endsWith(".mp4") || filename.endsWith(".mov") || filename.endsWith(".webm") || filename.endsWith(".avi")));
 
     const detectedResourceType = isVideo ? "video" : (resourceType === "raw" ? "raw" : "image");
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-    const apiKey = process.env.CLOUDINARY_API_KEY;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    let cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    let apiKey = process.env.CLOUDINARY_API_KEY;
+    let apiSecret = process.env.CLOUDINARY_API_SECRET;
     let uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
 
     // Auto-parse CLOUDINARY_URL if provided
@@ -615,9 +1011,9 @@ app.post("/api/upload", async (req, res) => {
       try {
         const rawUrl = process.env.CLOUDINARY_URL.replace("cloudinary://", "http://");
         const parsed = new URL(rawUrl);
-        if (parsed.username) (apiKey as any) = parsed.username;
-        if (parsed.password) (apiSecret as any) = parsed.password;
-        if (parsed.hostname) (cloudName as any) = parsed.hostname;
+        if (parsed.username) apiKey = parsed.username;
+        if (parsed.password) apiSecret = parsed.password;
+        if (parsed.hostname) cloudName = parsed.hostname;
       } catch {}
     }
 
@@ -718,8 +1114,7 @@ app.post("/api/upload", async (req, res) => {
   } catch (error: any) {
     console.error("Upload Endpoint Error:", error);
     return res.status(500).json({
-      error: "Erreur lors du traitement du fichier",
-      details: error?.message || String(error),
+      error: "Erreur interne du serveur",
     });
   }
 });
@@ -741,9 +1136,7 @@ app.get("/api/upload/config", (_req, res) => {
     provider: "cloudinary",
   });
 });
-    status: "Actif & Connecté",
-  });
-});
+
 
 // Community CV Submission & Opportunity Matching Endpoint
 const communitySubmissions: any[] = [];
@@ -875,8 +1268,9 @@ app.get("/api/quotes", async (_req, res) => {
 });
 
 app.post(["/api/quotes", "/api/quotes/submit"], async (req, res) => {
+  const { neonDbService } = await import("../src/db/neon-service.ts");
   const quoteData = req.body;
-  const quoteId = quoteData.id || `SAT-DEV-${Math.floor(100000 + Math.random() * 900000)}`;
+  const quoteId = quoteData.id || await neonDbService.generateSequentialQuoteId();
   const existingIdx = inMemoryData.quotes.findIndex((q) => q.id === quoteId);
   const newQuote = {
     ...quoteData,
@@ -906,7 +1300,7 @@ app.post(["/api/quotes", "/api/quotes/submit"], async (req, res) => {
 });
 
 // PUT /api/quotes/:id — Mise à jour générale d'un devis (NeonDB)
-app.put("/api/quotes/:id", async (req, res) => {
+app.put("/api/quotes/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -929,7 +1323,7 @@ app.put("/api/quotes/:id", async (req, res) => {
 });
 
 // PUT /api/quotes/:id/proposal — Enregistrement d'une proposition commerciale (NeonDB)
-app.put("/api/quotes/:id/proposal", async (req, res) => {
+app.put("/api/quotes/:id/proposal", requireAuth, async (req, res) => {
   const { id } = req.params;
   const proposalUpdates = {
     ...req.body,
@@ -963,7 +1357,7 @@ app.put("/api/quotes/:id/proposal", async (req, res) => {
 });
 
 // PUT /api/quotes/:id/decision — Décision client ACCEPTE/REFUSE (NeonDB)
-app.put("/api/quotes/:id/decision", async (req, res) => {
+app.put("/api/quotes/:id/decision", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { decision, notes } = req.body;
   const newStatus = decision === "ACCEPTE" ? "VALIDE" : "REFUSE";
@@ -1001,7 +1395,7 @@ app.put("/api/quotes/:id/decision", async (req, res) => {
 });
 
 // DELETE /api/quotes/:id — Suppression NeonDB + mémoire
-app.delete("/api/quotes/:id", async (req, res) => {
+app.delete("/api/quotes/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -1027,7 +1421,7 @@ app.get("/api/marketplace/pros", (_req, res) => {
 
 app.post("/api/marketplace/book", async (req, res) => {
   const booking = req.body;
-  const bookingId = `SAT-RES-${Math.floor(100000 + Math.random() * 900000)}`;
+  const bookingId = `SAT-RES-${crypto.randomUUID().slice(0,8)}`;
   const newBooking = {
     ...booking,
     id: bookingId,
@@ -1059,10 +1453,10 @@ app.post("/api/marketplace/book", async (req, res) => {
 });
 
 // 6. Checkout & Payments Endpoint
-app.post("/api/checkout/process", async (req, res) => {
+app.post("/api/checkout/process", validateBody(schemas.checkoutProcess), async (req, res) => {
   const { amount, method, customerInfo, items } = req.body;
-  const transactionId = `TX-SAT-${Math.floor(1000000 + Math.random() * 9000000)}`;
-  const orderId = `CMD-SAT-${Math.floor(100000 + Math.random() * 900000)}`;
+  const transactionId = `TX-SAT-${crypto.randomUUID().slice(0,8)}`;
+  const orderId = `CMD-SAT-${crypto.randomUUID().slice(0,8)}`;
 
   const newOrder = {
     id: orderId,
@@ -1119,8 +1513,8 @@ app.post("/api/invoices/generate", (req, res) => {
       notes = "Garantie matériel 12 mois & Support Technique Inclus.",
     } = req.body;
 
-    const invoiceNumber = `FAC-2026-${Math.floor(100000 + Math.random() * 900000)}`;
-    const transactionRef = `TX-SAT-${Math.floor(1000000 + Math.random() * 9000000)}`;
+    const invoiceNumber = `FAC-2026-${crypto.randomUUID().slice(0,8)}`;
+    const transactionRef = `TX-SAT-${crypto.randomUUID().slice(0,8)}`;
     const date = new Date().toISOString();
 
     const formattedItems = items.length > 0 ? items.map((item: any) => {
@@ -1195,7 +1589,7 @@ app.post("/api/invoices/generate", (req, res) => {
 });
 
 // 8. E-Commerce Store Products
-app.get("/api/products", async (_req, res) => {
+app.get("/api/products", requireAuth, async (_req, res) => {
   try {
     const dbProducts = await neonDbService.getAllProducts();
     if (dbProducts && dbProducts.length > 0) {
@@ -1207,9 +1601,9 @@ app.get("/api/products", async (_req, res) => {
   res.json({ success: true, count: 0, products: [] });
 });
 
-app.post("/api/products", async (req, res) => {
+app.post("/api/products", requireAuth, async (req, res) => {
   const newProduct = {
-    id: req.body.id || `PROD-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: req.body.id || `PROD-${crypto.randomUUID().slice(0,8)}`,
     ...req.body,
     createdAt: req.body.createdAt || new Date().toISOString(),
   };
@@ -1238,8 +1632,10 @@ app.get("/api/orders", async (_req, res) => {
 });
 
 app.post("/api/orders", async (req, res) => {
+  const { neonDbService } = await import("../src/db/neon-service.ts");
+  const generatedId = await neonDbService.generateSequentialOrderId();
   const newOrder = {
-    id: req.body.id || `CMD-SAT-${Math.floor(100000 + Math.random() * 900000)}`,
+    id: req.body.id || generatedId,
     ...req.body,
     createdAt: req.body.createdAt || new Date().toISOString(),
   };
@@ -1269,7 +1665,7 @@ app.get("/api/courses", async (_req, res) => {
 
 app.post("/api/courses", async (req, res) => {
   const newCourse = {
-    id: req.body.id || `CRS-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: req.body.id || `CRS-${crypto.randomUUID().slice(0,8)}`,
     ...req.body,
     studentsCount: req.body.studentsCount || 0,
     createdAt: req.body.createdAt || new Date().toISOString(),
@@ -1290,13 +1686,13 @@ app.post("/api/courses/enroll", (req, res) => {
   res.json({
     success: true,
     message: `Inscription validée pour la formation #${courseId} par ${studentName || "Étudiant"}.`,
-    enrollmentId: `ENR-${Math.floor(100000 + Math.random() * 900000)}`,
+    enrollmentId: `ENR-${crypto.randomUUID().slice(0,8)}`,
   });
 });
 
 app.post("/api/certificates/generate", (req, res) => {
   const { studentName, courseTitle, issueDate } = req.body;
-  const certificateId = `CERT-SAT-${Math.floor(100000 + Math.random() * 900000)}`;
+  const certificateId = `CERT-SAT-${crypto.randomUUID().slice(0,8)}`;
   res.json({
     success: true,
     certificateId,
@@ -1311,16 +1707,16 @@ app.get("/api/services", async (_req, res) => {
     const { SEED_SERVICES } = await import("../src/database/seed-data.ts");
     res.json({ success: true, count: SEED_SERVICES.length, services: SEED_SERVICES });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, services: [] });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", services: [] });
   }
 });
 
-app.get("/api/pros", async (_req, res) => {
+app.get("/api/pros", requireAuth, async (_req, res) => {
   try {
     const { SEED_PROS } = await import("../src/database/seed-data.ts");
     res.json({ success: true, count: SEED_PROS.length, pros: SEED_PROS });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message, pros: [] });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur", pros: [] });
   }
 });
 
@@ -1332,7 +1728,7 @@ app.get("/api/tickets", (_req, res) => {
 
 app.post("/api/tickets", (req, res) => {
   const newTicket = {
-    id: `TCK-${Math.floor(100000 + Math.random() * 900000)}`,
+    id: `TCK-${crypto.randomUUID().slice(0,8)}`,
     ...req.body,
     status: req.body.status || "OUVERT",
     createdAt: new Date().toISOString(),
@@ -1348,7 +1744,7 @@ app.get("/api/system/status", async (_req, res) => {
     const { sql } = await import("../src/db/neon.ts");
     await sql`SELECT 1;`;
   } catch (e: any) {
-    neonStatus = `AVERTISSEMENT: ${e?.message || "Non joignable"}`;
+    neonStatus = "NON JOIGNABLE";
   }
 
   res.json({
@@ -1378,9 +1774,9 @@ app.get("/api/system/status", async (_req, res) => {
 });
 
 // 12. Partner Applications Endpoint
-app.post("/api/partners/apply", async (req, res) => {
+app.post("/api/partners/apply", requireAuth, validateBody(schemas.partnerApply), async (req, res) => {
   const partnerData = req.body;
-  const id = `PARTNER-${Date.now()}`;
+  const id = `PARTNER-${crypto.randomUUID().slice(0,8)}`;
   const partner = { id, ...partnerData, createdAt: new Date().toISOString() };
 
   try {
@@ -1399,7 +1795,112 @@ app.post("/api/partners/apply", async (req, res) => {
 });
 
 // 12. Authentication Endpoints
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/verify-pin", async (req, res) => {
+  const { phone, pin } = req.body;
+  if (!phone || !pin) return res.status(400).json({ success: false, error: "Téléphone et PIN requis." });
+
+  // Extraction IP pour le pare-feu
+  const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "0.0.0.0") as string;
+  const ip = Array.isArray(clientIp) ? clientIp[0] : clientIp.split(',')[0];
+
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    
+    // Vérification Pare-Feu
+    const status = await neonDbService.getSecurityStatus(ip);
+    if (status.blocked) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Accès bloqué. Trop de tentatives suspectes détectées. Votre adresse IP a été bloquée pour des raisons de sécurité." 
+      });
+    }
+
+    const dbUser = await neonDbService.getUserByPhone(phone);
+    
+    if (dbUser && dbUser.pin === pin) {
+      // Succès: Réinitialisation du compteur d'erreurs IP
+      await neonDbService.resetFailedAttempts(ip);
+
+      return res.json({
+        success: true,
+        account: {
+          phone: dbUser.phone,
+          cleanPhone: dbUser.phone.replace(/\\D/g, "").slice(-9),
+          email: dbUser.email,
+          fullName: dbUser.full_name,
+          role: dbUser.role || "CLIENT",
+          region: dbUser.region || "Dakar",
+          proStatus: dbUser.data?.proStatus,
+          proApproved: dbUser.data?.proApproved,
+          trialExpiresAt: dbUser.data?.trialExpiresAt,
+          proFreeTrialActive: dbUser.data?.proFreeTrialActive,
+        }
+      });
+    } else {
+      // Échec: Incrémentation du compteur et potentiel blocage
+      const attemptRes = await neonDbService.recordFailedAttempt(ip, phone);
+      if (attemptRes.blocked) {
+        return res.status(403).json({ 
+          success: false, 
+          error: "Alerte de Sécurité: Trop de tentatives. Votre adresse IP a été temporairement bloquée." 
+        });
+      }
+      return res.status(401).json({ 
+        success: false, 
+        error: `Code PIN incorrect. Attention, il vous reste quelques tentatives avant le blocage de votre adresse IP.` 
+      });
+    }
+  } catch (e) {
+    console.warn("Neon DB verify-pin error:", e);
+    return res.status(500).json({ success: false, error: "Erreur interne de sécurité." });
+  }
+});
+
+// 13. Security & Pare-Feu Endpoints (Admin Only)
+app.get("/api/admin/security/blocked-ips", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const ips = await neonDbService.getAllBlockedIps();
+    res.json({ success: true, blockedIps: ips });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "Erreur récupération IPS." });
+  }
+});
+
+app.post("/api/admin/security/unblock", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ip } = req.body;
+    if (!ip) return res.status(400).json({ success: false, error: "IP requise." });
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.unblockIp(ip);
+    res.json({ success: true, message: `IP ${ip} débloquée avec succès.` });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "Erreur déblocage." });
+  }
+});
+
+app.get("/api/admin/security/settings", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    const settings = await neonDbService.getSecuritySettings();
+    res.json({ success: true, settings });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "Erreur paramètres." });
+  }
+});
+
+app.post("/api/admin/security/settings", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { maxAttempts, lockDurationMinutes } = req.body;
+    const { neonDbService } = await import("../src/db/neon-service.ts");
+    await neonDbService.updateSecuritySettings({ maxAttempts, lockDurationMinutes });
+    res.json({ success: true, message: "Paramètres de sécurité mis à jour." });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "Erreur mise à jour." });
+  }
+});
+
+app.post("/api/auth/login", validateBody(schemas.login), async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -1422,9 +1923,10 @@ app.post("/api/auth/login", async (req, res) => {
 
       const token = signJwt({ sub: dbUser.id, email: dbUser.email, role: dbUser.role || "CLIENT" });
 
+      const { passwordHash: _p, ...safeUser } = dbUser as any;
       return res.json({
         success: true,
-        user: { ...dbUser, role: dbUser.role || "CLIENT" },
+        user: { ...safeUser, role: dbUser.role || "CLIENT" },
         token,
       });
     }
@@ -1435,7 +1937,7 @@ app.post("/api/auth/login", async (req, res) => {
   res.status(401).json({ success: false, error: "Email ou mot de passe incorrect." });
 });
 
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", validateBody(schemas.register), async (req, res) => {
   const { fullName, email, role = "CLIENT", phone, pin, password } = req.body;
 
   if (!email || !password) {
@@ -1450,7 +1952,7 @@ app.post("/api/auth/register", async (req, res) => {
     fullName: fullName || email.split("@")[0].toUpperCase(),
     email: email.toLowerCase().trim(),
     phone: phone || "+221 77 000 00 00",
-    role,
+    role: "CLIENT",
     city: req.body.city || "Dakar",
     status: "ACTIF",
     passwordHash,
@@ -1474,10 +1976,11 @@ app.post("/api/auth/register", async (req, res) => {
 
   const token = signJwt({ sub: newUser.id, email: newUser.email, role: newUser.role });
 
+  const { passwordHash: _p, ...safeUser } = newUser;
   res.json({
     success: true,
     message: "Compte créé avec succès.",
-    user: newUser,
+    user: safeUser,
     token,
   });
 });
@@ -1489,7 +1992,7 @@ app.post("/api/auth/register", async (req, res) => {
 // Helper function to log admin actions
 const logAdminAction = (action: string, description: string, user: string = "admin@senauratech.sn") => {
   inMemoryData.logs.unshift({
-    id: `LOG-${Math.floor(100000 + Math.random() * 900000)}`,
+    id: `LOG-${crypto.randomUUID().slice(0,8)}`,
     action,
     description,
     user,
@@ -1498,7 +2001,7 @@ const logAdminAction = (action: string, description: string, user: string = "adm
 };
 
 // A. Global Admin Overview & Key Performance Indicators (KPIs)
-app.get("/api/admin/stats", async (_req, res) => {
+app.get("/api/admin/stats", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const dbStats = await neonDbService.getGlobalAdminStats();
@@ -1525,8 +2028,8 @@ app.get("/api/admin/stats", async (_req, res) => {
             uptimeSeconds: process.uptime(),
             environment: process.env.NODE_ENV || "development",
             cloudinaryConnected: true,
-            cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "t7lndpvi",
-            geminiAiStatus: process.env.GEMINI_API_KEY ? "Operationnel (API Key Définie)" : "Actif (Réponses Simulées)",
+            cloudinaryConfigured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_UPLOAD_PRESET),
+            geminiAiStatus: "Configuré",
             timestamp: new Date().toISOString(),
           },
         },
@@ -1567,8 +2070,8 @@ app.get("/api/admin/stats", async (_req, res) => {
         uptimeSeconds: process.uptime(),
         environment: process.env.NODE_ENV || "development",
         cloudinaryConnected: true,
-        cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || "t7lndpvi",
-        geminiAiStatus: process.env.GEMINI_API_KEY ? "Operationnel (API Key Définie)" : "Actif (Réponses Simulées)",
+        cloudinaryConfigured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_UPLOAD_PRESET),
+        geminiAiStatus: "Configuré",
         timestamp: new Date().toISOString(),
       },
     },
@@ -1576,7 +2079,7 @@ app.get("/api/admin/stats", async (_req, res) => {
 });
 
 // B. Admin Quotes Management — 100% NeonDB
-app.get("/api/admin/quotes", async (_req, res) => {
+app.get("/api/admin/quotes", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const quotes = await neonDbService.getAllQuotes();
@@ -1589,9 +2092,9 @@ app.get("/api/admin/quotes", async (_req, res) => {
   }
 });
 
-app.post("/api/admin/quotes", async (req, res) => {
+app.post("/api/admin/quotes", requireAuth, requireAdmin, validateBody(schemas.quoteCreate), async (req, res) => {
   const newQuote = {
-    id: req.body.id || `SAT-DEV-${Math.floor(100000 + Math.random() * 900000)}`,
+    id: req.body.id || `SAT-DEV-${crypto.randomUUID().slice(0,8)}`,
     pole: req.body.pole || "Solutions Numériques",
     serviceTitle: req.body.serviceTitle || req.body.service || req.body.title || "Demande de devis",
     userId: req.body.userId || "admin",
@@ -1618,7 +2121,7 @@ app.post("/api/admin/quotes", async (req, res) => {
   res.json({ success: true, message: "Devis créé et persisté en base de données avec succès", quote: newQuote });
 });
 
-app.put("/api/admin/quotes/:id", async (req, res) => {
+app.put("/api/admin/quotes/:id", requireAuth, requireAdmin, validateBody(schemas.quoteUpdate), async (req, res) => {
   const { id } = req.params;
 
   // 1. Update in NeonDB (source of truth)
@@ -1651,7 +2154,7 @@ app.put("/api/admin/quotes/:id", async (req, res) => {
   res.json({ success: true, message: `Devis ${id} mis à jour`, quote: fallbackQuote });
 });
 
-app.delete("/api/admin/quotes/:id", async (req, res) => {
+app.delete("/api/admin/quotes/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   inMemoryData.quotes = inMemoryData.quotes.filter((q: any) => q.id !== id);
   try {
@@ -1663,7 +2166,7 @@ app.delete("/api/admin/quotes/:id", async (req, res) => {
 });
 
 // C. Admin Orders Management
-app.get("/api/admin/orders", async (_req, res) => {
+app.get("/api/admin/orders", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const orders = await neonDbService.getAllOrders();
@@ -1674,7 +2177,7 @@ app.get("/api/admin/orders", async (_req, res) => {
   }
 });
 
-app.put("/api/admin/orders/:id", async (req, res) => {
+app.put("/api/admin/orders/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   try {
@@ -1692,7 +2195,7 @@ app.put("/api/admin/orders/:id", async (req, res) => {
   res.status(404).json({ error: "Commande introuvable" });
 });
 
-app.delete("/api/admin/orders/:id", async (req, res) => {
+app.delete("/api/admin/orders/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -1706,7 +2209,7 @@ app.delete("/api/admin/orders/:id", async (req, res) => {
 });
 
 // D. Admin Products Management
-app.get("/api/admin/products", async (_req, res) => {
+app.get("/api/admin/products", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const products = await neonDbService.getAllProducts();
@@ -1717,9 +2220,9 @@ app.get("/api/admin/products", async (_req, res) => {
   }
 });
 
-app.post("/api/admin/products", async (req, res) => {
+app.post("/api/admin/products", requireAuth, requireAdmin, validateBody(schemas.productCreate), async (req, res) => {
   const newProd = {
-    id: `PROD-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: `PROD-${crypto.randomUUID().slice(0,8)}`,
     ...req.body,
     createdAt: new Date().toISOString(),
   };
@@ -1736,7 +2239,7 @@ app.post("/api/admin/products", async (req, res) => {
   res.json({ success: true, message: "Produit ajouté et persisté avec succès", product: newProd });
 });
 
-app.put("/api/admin/products/:id", async (req, res) => {
+app.put("/api/admin/products/:id", requireAuth, requireAdmin, validateBody(schemas.productUpdate), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -1762,7 +2265,7 @@ app.put("/api/admin/products/:id", async (req, res) => {
   res.status(404).json({ error: "Produit introuvable" });
 });
 
-app.delete("/api/admin/products/:id", async (req, res) => {
+app.delete("/api/admin/products/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   inMemoryData.products = inMemoryData.products.filter((p: any) => p.id !== id);
   inMemoryData.vendorProducts = inMemoryData.vendorProducts?.filter((p: any) => p.id !== id) || [];
@@ -1775,7 +2278,7 @@ app.delete("/api/admin/products/:id", async (req, res) => {
 });
 
 // E. Admin Courses Management
-app.get("/api/admin/courses", async (_req, res) => {
+app.get("/api/admin/courses", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const courses = await neonDbService.getAllCourses();
@@ -1786,9 +2289,9 @@ app.get("/api/admin/courses", async (_req, res) => {
   }
 });
 
-app.post("/api/admin/courses", async (req, res) => {
+app.post("/api/admin/courses", requireAuth, requireAdmin, validateBody(schemas.courseCreate), async (req, res) => {
   const newCourse = {
-    id: `CRS-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: `CRS-${crypto.randomUUID().slice(0,8)}`,
     studentsCount: 0,
     ...req.body,
     createdAt: new Date().toISOString(),
@@ -1806,7 +2309,7 @@ app.post("/api/admin/courses", async (req, res) => {
   res.json({ success: true, message: "Formation ajoutée et persistée avec succès", course: newCourse });
 });
 
-app.put("/api/admin/courses/:id", async (req, res) => {
+app.put("/api/admin/courses/:id", requireAuth, requireAdmin, validateBody(schemas.courseUpdate), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -1834,7 +2337,7 @@ app.put("/api/admin/courses/:id", async (req, res) => {
   res.json({ success: true, message: `Formation ${id} mise à jour`, course: { id, ...req.body } });
 });
 
-app.delete("/api/admin/courses/:id", async (req, res) => {
+app.delete("/api/admin/courses/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   inMemoryData.courses = inMemoryData.courses.filter((c: any) => c.id !== id);
   try {
@@ -1846,7 +2349,7 @@ app.delete("/api/admin/courses/:id", async (req, res) => {
 });
 
 // F. Admin Users Management
-app.get("/api/admin/users", async (_req, res) => {
+app.get("/api/admin/users", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const users = await neonDbService.getAllUsers();
@@ -1857,7 +2360,7 @@ app.get("/api/admin/users", async (_req, res) => {
   }
 });
 
-app.post("/api/admin/users", async (req, res) => {
+app.post("/api/admin/users", requireAuth, requireAdmin, validateBody(schemas.adminUserCreate), async (req, res) => {
   const { fullName, email, role = "CLIENT", city = "Dakar", phone = "", status = "ACTIF" } = req.body;
   const cleanPhone = phone ? phone.replace(/\D/g, "") : "";
   const normPhone = cleanPhone.startsWith("221") && cleanPhone.length === 12 ? cleanPhone.slice(3) : cleanPhone;
@@ -1891,7 +2394,7 @@ app.post("/api/admin/users", async (req, res) => {
     console.warn("Neon check error in admin create user:", dbErr);
   }
 
-  const newUserId = `USR-${Math.floor(10000 + Math.random() * 90000)}`;
+  const newUserId = `USR-${crypto.randomUUID().slice(0,8)}`;
   const newUser = {
     id: newUserId,
     fullName: fullName || "Nouvel Utilisateur",
@@ -1924,7 +2427,7 @@ app.post("/api/admin/users", async (req, res) => {
   res.json({ success: true, message: "Utilisateur créé avec succès", user: newUser });
 });
 
-app.put("/api/admin/users/:id", async (req, res) => {
+app.put("/api/admin/users/:id", requireAuth, requireAdmin, validateBody(schemas.adminUserUpdate), async (req, res) => {
   const { id } = req.params;
   const idx = inMemoryData.users.findIndex((u: any) => u.id === id);
 
@@ -1986,7 +2489,7 @@ app.put("/api/admin/users/:id", async (req, res) => {
 });
 
 // Admin toggle user status (ACTIVE / PENDING) with Welcome / Activation notification trigger
-app.put("/api/admin/users/:id/status", async (req, res) => {
+app.put("/api/admin/users/:id/status", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { status, fullName, email, phone, role } = req.body;
   const cleanId = id.replace(/\D/g, "");
@@ -2040,7 +2543,7 @@ app.post("/api/notifications/pro-receipt", (req, res) => {
   });
 });
 
-app.delete("/api/admin/users/:id", async (req, res) => {
+app.delete("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   inMemoryData.users = inMemoryData.users.filter((u: any) => u.id !== id);
   try {
@@ -2052,7 +2555,7 @@ app.delete("/api/admin/users/:id", async (req, res) => {
 });
 
 // G. Admin Partners Management
-app.get("/api/admin/partners", async (_req, res) => {
+app.get("/api/admin/partners", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const partners = await neonDbService.getAllPartners();
@@ -2063,7 +2566,7 @@ app.get("/api/admin/partners", async (_req, res) => {
   }
 });
 
-app.put("/api/admin/partners/:id", async (req, res) => {
+app.put("/api/admin/partners/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   try {
@@ -2088,7 +2591,7 @@ app.put("/api/admin/partners/:id", async (req, res) => {
   res.status(404).json({ error: "Partenaire introuvable" });
 });
 
-app.delete("/api/admin/partners/:id", async (req, res) => {
+app.delete("/api/admin/partners/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -2109,7 +2612,7 @@ app.delete("/api/admin/partners/:id", async (req, res) => {
 });
 
 // H. Admin Audit Trail Logs
-app.get("/api/admin/logs", async (_req, res) => {
+app.get("/api/admin/logs", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const logs = await neonDbService.getAllLogs();
@@ -2121,10 +2624,10 @@ app.get("/api/admin/logs", async (_req, res) => {
   }
 });
 
-app.post("/api/admin/logs", async (req, res) => {
+app.post("/api/admin/logs", requireAuth, requireAdmin, async (req, res) => {
   const { action, description, user = "ADMIN" } = req.body;
   const newLog = {
-    id: `LOG-${Math.floor(100000 + Math.random() * 900000)}`,
+    id: `LOG-${crypto.randomUUID().slice(0,8)}`,
     action: action || "ACTION_ADMIN",
     description: description || "Action administrateur exécutée",
     user,
@@ -2147,7 +2650,7 @@ app.post("/api/admin/logs", async (req, res) => {
 // ==========================================
 
 // A. Trainer Dashboard Statistics & Overview
-app.get("/api/trainer/stats", async (_req, res) => {
+app.get("/api/trainer/stats", requireAuth, async (_req, res) => {
   let courses = inMemoryData.courses;
   let students = inMemoryData.trainerStudents;
   let assignments = inMemoryData.trainerAssignments;
@@ -2200,7 +2703,7 @@ app.get("/api/trainer/stats", async (_req, res) => {
 });
 
 // B. Trainer Courses Management
-app.get("/api/trainer/courses", async (_req, res) => {
+app.get("/api/trainer/courses", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const courses = await neonDbService.getAllCourses();
@@ -2212,10 +2715,10 @@ app.get("/api/trainer/courses", async (_req, res) => {
   }
 });
 
-app.post("/api/trainer/courses", async (req, res) => {
+app.post("/api/trainer/courses", requireAuth, async (req, res) => {
   const body = req.body;
   const newCourse = {
-    id: body.id || `CRS-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: body.id || `CRS-${crypto.randomUUID().slice(0,8)}`,
     title: body.title || "Nouvelle Formation SEN AURA ACADEMY",
     instructor: body.instructor || body.instructorName || "Expert SEN AURA",
     category: body.category || "IA & Tech",
@@ -2243,7 +2746,7 @@ app.post("/api/trainer/courses", async (req, res) => {
   res.json({ success: true, message: "Formation publiée avec succès dans le catalogue Academy", course: newCourse });
 });
 
-app.put("/api/trainer/courses/:id", async (req, res) => {
+app.put("/api/trainer/courses/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -2272,7 +2775,7 @@ app.put("/api/trainer/courses/:id", async (req, res) => {
   res.json({ success: true, message: `Formation ${id} mise à jour (fallback)`, course: { id, ...req.body } });
 });
 
-app.delete("/api/trainer/courses/:id", async (req, res) => {
+app.delete("/api/trainer/courses/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   inMemoryData.courses = inMemoryData.courses.filter((c: any) => c.id !== id);
   try {
@@ -2283,7 +2786,7 @@ app.delete("/api/trainer/courses/:id", async (req, res) => {
 });
 
 // C. Trainer Students & Enrollment Management
-app.get("/api/trainer/students", async (_req, res) => {
+app.get("/api/trainer/students", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const students = await neonDbService.getRecords("trainer_students");
@@ -2295,7 +2798,7 @@ app.get("/api/trainer/students", async (_req, res) => {
   }
 });
 
-app.post("/api/trainer/students/enroll", async (req, res) => {
+app.post("/api/trainer/students/enroll", requireAuth, async (req, res) => {
   const { courseId, studentName, studentEmail, phone } = req.body;
   const course = inMemoryData.courses.find((c: any) => c.id === courseId) || inMemoryData.courses[0];
   const newStudent = {
@@ -2310,7 +2813,7 @@ app.post("/api/trainer/students/enroll", async (req, res) => {
     joinedAt: new Date().toISOString(),
   };
 
-  const id = `ENR-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `ENR-${crypto.randomUUID().slice(0,8)}`;
 
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -2325,7 +2828,7 @@ app.post("/api/trainer/students/enroll", async (req, res) => {
   res.json({ success: true, message: `Étudiant ${newStudent.studentName} inscrit à la formation`, student: completeStudent });
 });
 
-app.put("/api/trainer/students/:id/progress", async (req, res) => {
+app.put("/api/trainer/students/:id/progress", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { progress, score, status } = req.body;
 
@@ -2352,7 +2855,7 @@ app.put("/api/trainer/students/:id/progress", async (req, res) => {
 });
 
 // D. Trainer Assignments & Evaluation
-app.get("/api/trainer/assignments", async (_req, res) => {
+app.get("/api/trainer/assignments", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const assignments = await neonDbService.getRecords("trainer_assignments");
@@ -2363,7 +2866,7 @@ app.get("/api/trainer/assignments", async (_req, res) => {
   }
 });
 
-app.post("/api/trainer/assignments", async (req, res) => {
+app.post("/api/trainer/assignments", requireAuth, async (req, res) => {
   const { courseId = "CRS-001", title, description, dueDate, maxGrade = 20 } = req.body;
   const newAssignment = {
     courseId,
@@ -2377,7 +2880,7 @@ app.post("/api/trainer/assignments", async (req, res) => {
     createdAt: new Date().toISOString(),
   };
 
-  const id = `EVAL-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `EVAL-${crypto.randomUUID().slice(0,8)}`;
 
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -2389,14 +2892,14 @@ app.post("/api/trainer/assignments", async (req, res) => {
   res.json({ success: true, message: "Exercice / Évaluation créée pour les étudiants", assignment: complete });
 });
 
-app.post("/api/trainer/assignments/:id/grade", async (req, res) => {
+app.post("/api/trainer/assignments/:id/grade", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { studentName, score, feedback } = req.body;
   
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     // Just a dummy logic for DB update to record grading event
-    await neonDbService.saveRecord("trainer_grades", `GRD-${Date.now()}`, { assignmentId: id, studentName, score, feedback });
+    await neonDbService.saveRecord("trainer_grades", `GRD-${crypto.randomUUID().slice(0,8)}`, { assignmentId: id, studentName, score, feedback });
   } catch (e) {}
 
   const assign = inMemoryData.trainerAssignments.find((a: any) => a.id === id);
@@ -2412,7 +2915,7 @@ app.post("/api/trainer/assignments/:id/grade", async (req, res) => {
 });
 
 // E. Trainer Earnings & Payouts
-app.get("/api/trainer/earnings", async (_req, res) => {
+app.get("/api/trainer/earnings", requireAuth, async (_req, res) => {
   let courses = inMemoryData.courses;
   let payouts = inMemoryData.trainerPayouts;
   try {
@@ -2443,9 +2946,9 @@ app.get("/api/trainer/earnings", async (_req, res) => {
   });
 });
 
-app.post("/api/trainer/payouts/request", async (req, res) => {
+app.post("/api/trainer/payouts/request", requireAuth, async (req, res) => {
   const { amountFCFA = 250000, paymentMethod = "WAVE", phone = "+221 77 555 44 33" } = req.body;
-  const id = `PAY-TRN-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `PAY-TRN-${crypto.randomUUID().slice(0,8)}`;
   const newPayout = {
     trainerName: "Dr. Mamadou Ndiaye",
     amountFCFA: Number(amountFCFA),
@@ -2472,7 +2975,7 @@ app.post("/api/trainer/payouts/request", async (req, res) => {
 });
 
 // F. Trainer Certificates Issuance
-app.get("/api/trainer/certificates", async (_req, res) => {
+app.get("/api/trainer/certificates", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const certs = await neonDbService.getRecords("trainer_certificates");
@@ -2483,9 +2986,9 @@ app.get("/api/trainer/certificates", async (_req, res) => {
   }
 });
 
-app.post("/api/trainer/certificates/issue", async (req, res) => {
+app.post("/api/trainer/certificates/issue", requireAuth, async (req, res) => {
   const { studentName, courseTitle } = req.body;
-  const certId = `CERT-SAT-${Math.floor(10000 + Math.random() * 90000)}`;
+  const certId = `CERT-SAT-${crypto.randomUUID().slice(0,8)}`;
   const newCert = {
     studentName: studentName || "Étudiant Diplômé",
     courseTitle: courseTitle || "Certification IA & Machine Learning Pratique (Dakar)",
@@ -2509,7 +3012,7 @@ app.post("/api/trainer/certificates/issue", async (req, res) => {
 });
 
 // G. Trainer Live Masterclass Schedules
-app.get("/api/trainer/schedules", async (_req, res) => {
+app.get("/api/trainer/schedules", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const scheds = await neonDbService.getRecords("trainer_schedules");
@@ -2520,7 +3023,7 @@ app.get("/api/trainer/schedules", async (_req, res) => {
   }
 });
 
-app.post("/api/trainer/schedules", async (req, res) => {
+app.post("/api/trainer/schedules", requireAuth, async (req, res) => {
   const { courseId = "CRS-001", title, date = "2026-08-22", startTime = "18:00", endTime = "20:00", meetUrl } = req.body;
   const newSchedule = {
     courseId,
@@ -2533,7 +3036,7 @@ app.post("/api/trainer/schedules", async (req, res) => {
     registeredStudents: 34,
   };
 
-  const id = `SCHED-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `SCHED-${crypto.randomUUID().slice(0,8)}`;
 
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -2595,8 +3098,8 @@ const handleVendorStats = async (_req: any, res: any) => {
   });
 };
 
-app.get("/api/vendor/stats", handleVendorStats);
-app.get("/api/vendeur/stats", handleVendorStats);
+app.get("/api/vendor/stats", requireAuth, handleVendorStats);
+app.get("/api/vendeur/stats", requireAuth, handleVendorStats);
 
 // Helper handler for Vendor Products List
 const handleGetVendorProducts = async (_req: any, res: any) => {
@@ -2611,8 +3114,8 @@ const handleGetVendorProducts = async (_req: any, res: any) => {
   }
 };
 
-app.get("/api/vendor/products", handleGetVendorProducts);
-app.get("/api/vendeur/products", handleGetVendorProducts);
+app.get("/api/vendor/products", requireAuth, handleGetVendorProducts);
+app.get("/api/vendeur/products", requireAuth, handleGetVendorProducts);
 
 // Helper handler for Vendor Create Product
 const handleCreateVendorProduct = async (req: any, res: any) => {
@@ -2639,7 +3142,7 @@ const handleCreateVendorProduct = async (req: any, res: any) => {
   const resolvedGallery = Array.isArray(galleryImages) ? galleryImages.slice(0, 3) : [];
 
   const newProduct = {
-    id: req.body.id || `VND-PROD-${Math.floor(100 + Math.random() * 900)}`,
+    id: req.body.id || `VND-PROD-${crypto.randomUUID().slice(0,8)}`,
     title: title || name || "Nouveau Produit Équipement Solaire",
     name: name || title || "Nouveau Produit Équipement Solaire",
     category,
@@ -2678,8 +3181,8 @@ const handleCreateVendorProduct = async (req: any, res: any) => {
   });
 };
 
-app.post("/api/vendor/products", handleCreateVendorProduct);
-app.post("/api/vendeur/products", handleCreateVendorProduct);
+app.post("/api/vendor/products", requireAuth, handleCreateVendorProduct);
+app.post("/api/vendeur/products", requireAuth, handleCreateVendorProduct);
 
 // Helper handler for Vendor Update Product
 const handleUpdateVendorProduct = async (req: any, res: any) => {
@@ -2725,8 +3228,8 @@ const handleUpdateVendorProduct = async (req: any, res: any) => {
   res.json({ success: true, message: `Produit Vendeur ${id} mis à jour (fallback)`, product: { id, ...req.body } });
 };
 
-app.put("/api/vendor/products/:id", handleUpdateVendorProduct);
-app.put("/api/vendeur/products/:id", handleUpdateVendorProduct);
+app.put("/api/vendor/products/:id", requireAuth, handleUpdateVendorProduct);
+app.put("/api/vendeur/products/:id", requireAuth, handleUpdateVendorProduct);
 
 // Helper handler for Vendor Delete Product
 const handleDeleteVendorProduct = async (req: any, res: any) => {
@@ -2753,8 +3256,8 @@ const handleDeleteVendorProduct = async (req: any, res: any) => {
   res.json({ success: true, message: `Produit Vendeur ${id} supprimé` });
 };
 
-app.delete("/api/vendor/products/:id", handleDeleteVendorProduct);
-app.delete("/api/vendeur/products/:id", handleDeleteVendorProduct);
+app.delete("/api/vendor/products/:id", requireAuth, handleDeleteVendorProduct);
+app.delete("/api/vendeur/products/:id", requireAuth, handleDeleteVendorProduct);
 
 // Helper handler for Vendor Orders
 const handleGetVendorOrders = async (_req: any, res: any) => {
@@ -2773,8 +3276,8 @@ const handleGetVendorOrders = async (_req: any, res: any) => {
   }
 };
 
-app.get("/api/vendor/orders", handleGetVendorOrders);
-app.get("/api/vendeur/orders", handleGetVendorOrders);
+app.get("/api/vendor/orders", requireAuth, handleGetVendorOrders);
+app.get("/api/vendeur/orders", requireAuth, handleGetVendorOrders);
 
 // Helper handler for Vendor Update Order Status
 const handleUpdateVendorOrderStatus = async (req: any, res: any) => {
@@ -2807,8 +3310,8 @@ const handleUpdateVendorOrderStatus = async (req: any, res: any) => {
   });
 };
 
-app.put("/api/vendor/orders/:id/status", handleUpdateVendorOrderStatus);
-app.put("/api/vendeur/orders/:id/status", handleUpdateVendorOrderStatus);
+app.put("/api/vendor/orders/:id/status", requireAuth, handleUpdateVendorOrderStatus);
+app.put("/api/vendeur/orders/:id/status", requireAuth, handleUpdateVendorOrderStatus);
 
 // Helper handler for Vendor Financial Earnings
 const handleGetVendorEarnings = async (_req: any, res: any) => {
@@ -2843,8 +3346,8 @@ const handleGetVendorEarnings = async (_req: any, res: any) => {
   });
 };
 
-app.get("/api/vendor/earnings", handleGetVendorEarnings);
-app.get("/api/vendeur/earnings", handleGetVendorEarnings);
+app.get("/api/vendor/earnings", requireAuth, handleGetVendorEarnings);
+app.get("/api/vendeur/earnings", requireAuth, handleGetVendorEarnings);
 
 // Helper handler for Vendor Payout Request
 const handleVendorPayoutRequest = async (req: any, res: any) => {
@@ -2858,7 +3361,7 @@ const handleVendorPayoutRequest = async (req: any, res: any) => {
     timestamp: new Date().toISOString(),
   };
 
-  const id = `PAY-VND-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `PAY-VND-${crypto.randomUUID().slice(0,8)}`;
 
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -2874,8 +3377,8 @@ const handleVendorPayoutRequest = async (req: any, res: any) => {
   });
 };
 
-app.post("/api/vendor/payouts/request", handleVendorPayoutRequest);
-app.post("/api/vendeur/payouts/request", handleVendorPayoutRequest);
+app.post("/api/vendor/payouts/request", requireAuth, handleVendorPayoutRequest);
+app.post("/api/vendeur/payouts/request", requireAuth, handleVendorPayoutRequest);
 
 // Helper handler for Vendor Analytics
 const handleGetVendorAnalytics = (_req: any, res: any) => {
@@ -2898,8 +3401,8 @@ const handleGetVendorAnalytics = (_req: any, res: any) => {
   });
 };
 
-app.get("/api/vendor/analytics", handleGetVendorAnalytics);
-app.get("/api/vendeur/analytics", handleGetVendorAnalytics);
+app.get("/api/vendor/analytics", requireAuth, handleGetVendorAnalytics);
+app.get("/api/vendeur/analytics", requireAuth, handleGetVendorAnalytics);
 
 // ==========================================
 // 16. DEDICATED PRESTATAIRE PRO ENDPOINTS (/api/pro/* & /api/prestataire/*)
@@ -2974,8 +3477,8 @@ const handleProStats = async (_req: any, res: any) => {
   });
 };
 
-app.get("/api/pro/stats", handleProStats);
-app.get("/api/prestataire/stats", handleProStats);
+app.get("/api/pro/stats", requireAuth, handleProStats);
+app.get("/api/prestataire/stats", requireAuth, handleProStats);
 
 const handleGetProProfile = async (_req: any, res: any) => {
   let profile = (inMemoryData as any).proProfile;
@@ -3014,10 +3517,10 @@ const handleUpdateProProfile = async (req: any, res: any) => {
   });
 };
 
-app.get("/api/pro/profile", handleGetProProfile);
-app.get("/api/prestataire/profile", handleGetProProfile);
-app.put("/api/pro/profile", handleUpdateProProfile);
-app.put("/api/prestataire/profile", handleUpdateProProfile);
+app.get("/api/pro/profile", requireAuth, handleGetProProfile);
+app.get("/api/prestataire/profile", requireAuth, handleGetProProfile);
+app.put("/api/pro/profile", requireAuth, handleUpdateProProfile);
+app.put("/api/prestataire/profile", requireAuth, handleUpdateProProfile);
 
 const handleGetProMissions = async (_req: any, res: any) => {
   try {
@@ -3030,13 +3533,13 @@ const handleGetProMissions = async (_req: any, res: any) => {
   }
 };
 
-app.get("/api/pro/missions", handleGetProMissions);
-app.get("/api/prestataire/missions", handleGetProMissions);
-app.get("/api/admin/missions", handleGetProMissions);
+app.get("/api/pro/missions", requireAuth, handleGetProMissions);
+app.get("/api/prestataire/missions", requireAuth, handleGetProMissions);
+app.get("/api/admin/missions", requireAuth, requireAdmin, handleGetProMissions);
 
 const handleCreateProMission = async (req: any, res: any) => {
   const { title, clientName = "Client Particulier", clientPhone = "+221 77 000 11 22", location = "Dakar", rewardFCFA = 75000, pole = "Solaire & Réseau", description = "Intervention technique sur site client au Sénégal.", scheduledDate = "Aujourd'hui à 16:00", urgency = "Standard" } = req.body;
-  const id = `MSN-PRO-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `MSN-PRO-${crypto.randomUUID().slice(0,8)}`;
   const newMission = {
     title: title || "Nouvelle Intervention Technique Terrain",
     clientName, clientPhone, location, pole, rewardFCFA: Number(rewardFCFA),
@@ -3054,9 +3557,9 @@ const handleCreateProMission = async (req: any, res: any) => {
   res.json({ success: true, message: "Nouvelle offre de mission publiée pour les prestataires agréés", mission: complete });
 };
 
-app.post("/api/pro/missions", handleCreateProMission);
-app.post("/api/prestataire/missions", handleCreateProMission);
-app.post("/api/admin/missions", handleCreateProMission);
+app.post("/api/pro/missions", requireAuth, handleCreateProMission);
+app.post("/api/prestataire/missions", requireAuth, handleCreateProMission);
+app.post("/api/admin/missions", requireAuth, requireAdmin, handleCreateProMission);
 
 const handleAcceptProMission = async (req: any, res: any) => {
   const { id } = req.params;
@@ -3077,8 +3580,8 @@ const handleAcceptProMission = async (req: any, res: any) => {
   res.json({ success: true, message: `Mission ${id} acceptée (DB)`, mission: { id, ...updates } });
 };
 
-app.post("/api/pro/missions/:id/accept", handleAcceptProMission);
-app.post("/api/prestataire/missions/:id/accept", handleAcceptProMission);
+app.post("/api/pro/missions/:id/accept", requireAuth, handleAcceptProMission);
+app.post("/api/prestataire/missions/:id/accept", requireAuth, handleAcceptProMission);
 
 const handleUpdateProMissionStatus = async (req: any, res: any) => {
   const { id } = req.params;
@@ -3103,9 +3606,9 @@ const handleUpdateProMissionStatus = async (req: any, res: any) => {
   res.json({ success: true, message: `Statut de la mission ${id} mis à jour : ${status} (DB)`, mission: { id, ...updates } });
 };
 
-app.put("/api/pro/missions/:id/status", handleUpdateProMissionStatus);
-app.put("/api/prestataire/missions/:id/status", handleUpdateProMissionStatus);
-app.put("/api/admin/missions/:id", async (req: any, res: any) => {
+app.put("/api/pro/missions/:id/status", requireAuth, handleUpdateProMissionStatus);
+app.put("/api/prestataire/missions/:id/status", requireAuth, handleUpdateProMissionStatus);
+app.put("/api/admin/missions/:id", requireAuth, requireAdmin, async (req: any, res: any) => {
   const { id } = req.params;
   
   try {
@@ -3119,7 +3622,7 @@ app.put("/api/admin/missions/:id", async (req: any, res: any) => {
   res.json({ success: true, message: "Mission mise à jour par l'administrateur", mission });
 });
 
-app.delete("/api/admin/missions/:id", async (req: any, res: any) => {
+app.delete("/api/admin/missions/:id", requireAuth, requireAdmin, async (req: any, res: any) => {
   const { id } = req.params;
   
   try {
@@ -3166,12 +3669,12 @@ const handleGetProEarnings = async (_req: any, res: any) => {
   });
 };
 
-app.get("/api/pro/earnings", handleGetProEarnings);
-app.get("/api/prestataire/earnings", handleGetProEarnings);
+app.get("/api/pro/earnings", requireAuth, handleGetProEarnings);
+app.get("/api/prestataire/earnings", requireAuth, handleGetProEarnings);
 
 const handleProPayoutRequest = async (req: any, res: any) => {
   const { amountFCFA = 100000, paymentMethod = "WAVE", phone = "+221 77 555 44 33" } = req.body;
-  const txRef = `${paymentMethod.toUpperCase()}-SN-${Math.floor(100000 + Math.random() * 900000)}`;
+  const txRef = `${paymentMethod.toUpperCase()}-SN-${crypto.randomUUID().slice(0,8)}`;
   const newPayout = {
     proName: "Ousmane Diallo (Technicien Agrée)",
     amountFCFA: Number(amountFCFA),
@@ -3182,7 +3685,7 @@ const handleProPayoutRequest = async (req: any, res: any) => {
     timestamp: new Date().toISOString(),
   };
 
-  const id = `PAY-PRO-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `PAY-PRO-${crypto.randomUUID().slice(0,8)}`;
 
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -3199,8 +3702,8 @@ const handleProPayoutRequest = async (req: any, res: any) => {
   });
 };
 
-app.post("/api/pro/payouts/request", handleProPayoutRequest);
-app.post("/api/prestataire/payouts/request", handleProPayoutRequest);
+app.post("/api/pro/payouts/request", requireAuth, handleProPayoutRequest);
+app.post("/api/prestataire/payouts/request", requireAuth, handleProPayoutRequest);
 
 // ==========================================
 // 17. DEDICATED PARTENAIRE B2B ENDPOINTS (/api/partner/* & /api/partenaire/*)
@@ -3241,8 +3744,8 @@ const handlePartnerStats = async (_req: any, res: any) => {
   });
 };
 
-app.get("/api/partner/stats", handlePartnerStats);
-app.get("/api/partenaire/stats", handlePartnerStats);
+app.get("/api/partner/stats", requireAuth, handlePartnerStats);
+app.get("/api/partenaire/stats", requireAuth, handlePartnerStats);
 
 const handleGetPartnerProjects = async (_req: any, res: any) => {
   try {
@@ -3255,8 +3758,8 @@ const handleGetPartnerProjects = async (_req: any, res: any) => {
   }
 };
 
-app.get("/api/partner/projects", handleGetPartnerProjects);
-app.get("/api/partenaire/projects", handleGetPartnerProjects);
+app.get("/api/partner/projects", requireAuth, handleGetPartnerProjects);
+app.get("/api/partenaire/projects", requireAuth, handleGetPartnerProjects);
 
 const handleCreatePartnerProject = async (req: any, res: any) => {
   const { title, partnerCompany = "Solar Tech Sénégal", contactName = "M. Sarr", contactPhone = "+221 77 111 22 33", estimatedValueFCFA = 15000000 } = req.body;
@@ -3272,7 +3775,7 @@ const handleCreatePartnerProject = async (req: any, res: any) => {
     createdAt: new Date().toISOString(),
   };
 
-  const id = `PRJ-PRT-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `PRJ-PRT-${crypto.randomUUID().slice(0,8)}`;
 
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -3288,8 +3791,8 @@ const handleCreatePartnerProject = async (req: any, res: any) => {
   });
 };
 
-app.post("/api/partner/projects", handleCreatePartnerProject);
-app.post("/api/partenaire/projects", handleCreatePartnerProject);
+app.post("/api/partner/projects", requireAuth, handleCreatePartnerProject);
+app.post("/api/partenaire/projects", requireAuth, handleCreatePartnerProject);
 
 const handlePartnerPayoutRequest = async (req: any, res: any) => {
   const { amountFCFA = 500000, paymentMethod = "VIREMENT_BANCAIRE_UEMOA", accountRef = "SN012 01001 998877665 11" } = req.body;
@@ -3302,7 +3805,7 @@ const handlePartnerPayoutRequest = async (req: any, res: any) => {
     timestamp: new Date().toISOString(),
   };
 
-  const id = `PAY-PRT-${Math.floor(100 + Math.random() * 900)}`;
+  const id = `PAY-PRT-${crypto.randomUUID().slice(0,8)}`;
 
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
@@ -3318,8 +3821,8 @@ const handlePartnerPayoutRequest = async (req: any, res: any) => {
   });
 };
 
-app.post("/api/partner/payouts/request", handlePartnerPayoutRequest);
-app.post("/api/partenaire/payouts/request", handlePartnerPayoutRequest);
+app.post("/api/partner/payouts/request", requireAuth, handlePartnerPayoutRequest);
+app.post("/api/partenaire/payouts/request", requireAuth, handlePartnerPayoutRequest);
 
 // ==========================================
 // 18. DEDICATED CLIENT / USER ENDPOINTS (/api/client/* & /api/user/*)
@@ -3358,8 +3861,8 @@ const handleClientStats = async (_req: any, res: any) => {
   });
 };
 
-app.get("/api/client/stats", handleClientStats);
-app.get("/api/user/stats", handleClientStats);
+app.get("/api/client/stats", requireAuth, handleClientStats);
+app.get("/api/user/stats", requireAuth, handleClientStats);
 
 const handleClientOrders = async (_req: any, res: any) => {
   try {
@@ -3372,8 +3875,8 @@ const handleClientOrders = async (_req: any, res: any) => {
   }
 };
 
-app.get("/api/client/orders", handleClientOrders);
-app.get("/api/user/orders", handleClientOrders);
+app.get("/api/client/orders", requireAuth, handleClientOrders);
+app.get("/api/user/orders", requireAuth, handleClientOrders);
 
 const handleClientQuotes = async (_req: any, res: any) => {
   try {
@@ -3386,8 +3889,8 @@ const handleClientQuotes = async (_req: any, res: any) => {
   }
 };
 
-app.get("/api/client/quotes", handleClientQuotes);
-app.get("/api/user/quotes", handleClientQuotes);
+app.get("/api/client/quotes", requireAuth, handleClientQuotes);
+app.get("/api/user/quotes", requireAuth, handleClientQuotes);
 
 // ==========================================
 // 19. ADDITIONAL FULL-STACK SERVICE ENDPOINTS
@@ -3440,7 +3943,7 @@ app.post("/api/ai/live-session", (_req, res) => {
     success: true,
     sessionId: `SESS-LIVE-${Date.now()}`,
     wsEndpoint: "wss://senauratech.sn/ws/live-ai",
-    token: `TOK-AI-${Math.floor(100000 + Math.random() * 900000)}`,
+    token: `TOK-AI-${crypto.randomUUID().slice(0,8)}`,
   });
 });
 
@@ -3482,7 +3985,7 @@ app.post("/api/gemini/audio-summary", (_req, res) => {
 // --- B. Payment Gateways (Wave, Orange Money) ---
 app.post("/api/payments/wave/initiate", (req, res) => {
   const { amount, phone, orderId } = req.body;
-  const transactionId = `TX-WAVE-${Math.floor(100000 + Math.random() * 900000)}`;
+  const transactionId = `TX-WAVE-${crypto.randomUUID().slice(0,8)}`;
   res.json({
     success: true,
     transactionId,
@@ -3497,13 +4000,13 @@ app.post("/api/payments/wave/initiate", (req, res) => {
 
 app.post("/api/payments/orange-money/initiate", (req, res) => {
   const { amount, phone, orderId } = req.body;
-  const transactionId = `TX-OM-${Math.floor(100000 + Math.random() * 900000)}`;
+  const transactionId = `TX-OM-${crypto.randomUUID().slice(0,8)}`;
   res.json({
     success: true,
     transactionId,
     amount,
     phone,
-    paymentCode: `#144#39*${Math.floor(1000 + Math.random() * 9000)}#`,
+    paymentCode: `#144#39*${crypto.randomUUID().slice(0,4)}#`,
     status: "PENDING",
     message: `Demande de paiement Orange Money de ${Number(amount).toLocaleString()} FCFA transmise au ${phone}.`,
   });
@@ -3526,7 +4029,7 @@ app.post("/api/sms/send", (req, res) => {
   const { recipient, message } = req.body;
   res.json({
     success: true,
-    messageId: `SMS-${Math.floor(100000 + Math.random() * 900000)}`,
+    messageId: `SMS-${crypto.randomUUID().slice(0,8)}`,
     recipient,
     status: "DELIVERED",
     provider: "SEN_AURA_SMS_GATEWAY",
@@ -3555,7 +4058,7 @@ app.post("/api/whatsapp/send-template", (req, res) => {
   const { phone, templateName } = req.body;
   res.json({
     success: true,
-    whatsappMessageId: `WA-${Math.floor(100000 + Math.random() * 900000)}`,
+    whatsappMessageId: `WA-${crypto.randomUUID().slice(0,8)}`,
     phone,
     status: "SENT",
   });
@@ -3584,7 +4087,7 @@ app.post("/api/email/send", (req, res) => {
   const { to, subject } = req.body;
   res.json({
     success: true,
-    emailId: `EML-${Math.floor(100000 + Math.random() * 900000)}`,
+    emailId: `EML-${crypto.randomUUID().slice(0,8)}`,
     to,
     subject,
     status: "SENT",
@@ -3632,7 +4135,7 @@ app.get("/api/search/fast", async (req, res) => {
       ...searchRes
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || "Search failed" });
+    res.status(500).json({ success: false, error: "Erreur interne du serveur" });
   }
 });
 
@@ -3672,7 +4175,7 @@ app.post("/api/certificates", async (req, res) => {
     return res.status(400).json({ success: false, error: "Nom de l'étudiant et Titre du cours requis" });
   }
 
-  const certNumber = certData.certificateNumber || certData.id || `CERT-SAT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+  const certNumber = certData.certificateNumber || certData.id || `CERT-SAT-2026-${crypto.randomUUID().slice(0,8)}`;
   const qrCode = certData.qrVerificationCode || `SAT-VERIFY-${certNumber}`;
 
   // Check uniqueness in Neon DB
@@ -3718,8 +4221,6 @@ app.get("/api/invoices/:invoiceId", async (req, res) => {
           issueDate: dbInvoice.issue_date || dbInvoice.created_at,
           status: dbInvoice.status,
           clientName: dbInvoice.client_name,
-          clientPhone: dbInvoice.client_phone,
-          clientEmail: dbInvoice.client_email,
           totalAmountFCFA: Number(dbInvoice.amount_fcfa),
           items: dbInvoice.items_json
         }
@@ -3753,8 +4254,6 @@ app.get("/api/certificates/verify/:certificateId", async (req, res) => {
           id: dbCert.id,
           certificateNumber: dbCert.certificate_number,
           studentName: dbCert.student_name,
-          studentEmail: dbCert.student_email,
-          studentPhone: dbCert.student_phone,
           courseTitle: dbCert.course_title,
           scoreOrMention: dbCert.score_or_mention,
           badgeTitle: dbCert.badge_title,
@@ -3810,7 +4309,7 @@ app.post("/api/shipping/calculate-rate", (req, res) => {
 
 app.post("/api/shipping/create-label", (req, res) => {
   const { recipientName, destinationCity } = req.body;
-  const trackingNumber = `TRK-SEN-${Math.floor(100000 + Math.random() * 900000)}`;
+  const trackingNumber = `TRK-SEN-${crypto.randomUUID().slice(0,8)}`;
   res.json({
     success: true,
     trackingNumber,
@@ -3853,7 +4352,7 @@ app.post("/api/inventory/reserve-stock", (req, res) => {
     success: true,
     productId,
     reservedQuantity: quantity || 1,
-    reservationId: `RES-STK-${Math.floor(100000 + Math.random() * 900000)}`,
+    reservationId: `RES-STK-${crypto.randomUUID().slice(0,8)}`,
   });
 });
 
@@ -3868,7 +4367,7 @@ app.post("/api/inventory/sync-erp", (_req, res) => {
 // --- H. Cloud Storage & Backup Services ---
 app.post("/api/storage/upload", (req, res) => {
   // Delegate to upload endpoint
-  const fileId = `FILE-${Math.floor(100000 + Math.random() * 900000)}`;
+  const fileId = `FILE-${crypto.randomUUID().slice(0,8)}`;
   res.json({
     success: true,
     fileId,
@@ -3896,8 +4395,8 @@ app.delete("/api/storage/delete/:fileId", (req, res) => {
   });
 });
 
-app.post("/api/backups/create", (_req, res) => {
-  const backupId = `BKP-${Math.floor(100000 + Math.random() * 900000)}`;
+app.post("/api/backups/create", requireAuth, requireAdmin, (_req, res) => {
+  const backupId = `BKP-${crypto.randomUUID().slice(0,8)}`;
   res.json({
     success: true,
     backupId,
@@ -3907,7 +4406,7 @@ app.post("/api/backups/create", (_req, res) => {
   });
 });
 
-app.get("/api/backups/list", (_req, res) => {
+app.get("/api/backups/list", requireAuth, requireAdmin, (_req, res) => {
   res.json({
     success: true,
     backups: [
@@ -3917,7 +4416,7 @@ app.get("/api/backups/list", (_req, res) => {
   });
 });
 
-app.post("/api/backups/restore/:backupId", (req, res) => {
+app.post("/api/backups/restore/:backupId", requireAuth, requireAdmin, (req, res) => {
   const { backupId } = req.params;
   res.json({
     success: true,
@@ -4022,7 +4521,7 @@ app.post("/api/ambassadors/apply", async (req, res) => {
     return res.status(400).json({ success: false, message: "Les champs Nom, Email et Téléphone sont obligatoires." });
   }
 
-  const id = `AMB-APP-${Math.floor(1000 + Math.random() * 9000)}`;
+  const id = `AMB-APP-${crypto.randomUUID().slice(0,8)}`;
   const newApp = {
     fullName, email, phone, country, city,
     profession: profession || "Ambassadeur Partenaire",
@@ -4063,7 +4562,7 @@ app.get("/api/ambassadors/applications", async (_req, res) => {
 });
 
 // 3. Update Application Status (Admin Approve / Reject / Complement)
-app.post("/api/ambassadors/applications/:id/status", async (req, res) => {
+app.post("/api/ambassadors/applications/:id/status", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { status, tier = "GOLD", commissionRatePercent, ambassadorCode, feedbackNotes } = req.body;
 
@@ -4085,7 +4584,7 @@ app.post("/api/ambassadors/applications/:id/status", async (req, res) => {
   if (commissionRatePercent) updates.commissionRatePercent = Number(commissionRatePercent);
   if (feedbackNotes !== undefined) updates.feedbackNotes = feedbackNotes;
   if (status === "VALIDE") {
-    updates.ambassadorCode = ambassadorCode || appItem.ambassadorCode || `SAT-AMB-00${Math.floor(10 + Math.random() * 90)}`;
+    updates.ambassadorCode = ambassadorCode || appItem.ambassadorCode || `SAT-AMB-${crypto.randomUUID().slice(0,8)}`;
   }
 
   try {
@@ -4102,7 +4601,7 @@ app.post("/api/ambassadors/applications/:id/status", async (req, res) => {
 });
 
 // 3b. Delete Application (Admin)
-app.delete("/api/ambassadors/applications/:id", async (req, res) => {
+app.delete("/api/ambassadors/applications/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -4139,7 +4638,7 @@ app.post("/api/ambassadors/prospects", async (req, res) => {
     });
   }
 
-  const prospectCode = `SAT-P-00${Math.floor(800 + Math.random() * 199)}`;
+  const prospectCode = `SAT-P-${crypto.randomUUID().slice(0,8)}`;
   const newProspect = {
     ambassadorId, ambassadorName, ambassadorCode, companyName, contactName, phone,
     email: email || `${companyName.toLowerCase().replace(/\s+/g, '')}@prospect.sn`,
@@ -4181,7 +4680,7 @@ app.get("/api/ambassadors/prospects/:ambassadorId?", async (req, res) => {
 });
 
 // 5b. Update Prospect details
-app.put("/api/ambassadors/prospects/:prospectId", async (req, res) => {
+app.put("/api/ambassadors/prospects/:prospectId", requireAuth, async (req, res) => {
   const { prospectId } = req.params;
 
   try {
@@ -4203,7 +4702,7 @@ app.put("/api/ambassadors/prospects/:prospectId", async (req, res) => {
 });
 
 // 5c. Delete Prospect
-app.delete("/api/ambassadors/prospects/:prospectId", async (req, res) => {
+app.delete("/api/ambassadors/prospects/:prospectId", requireAuth, async (req, res) => {
   const { prospectId } = req.params;
 
   try {
@@ -4219,7 +4718,7 @@ app.delete("/api/ambassadors/prospects/:prospectId", async (req, res) => {
 });
 
 // 6. Update Prospect Deal Stage (e.g. PROJET_SIGNE -> Generates Commission)
-app.put("/api/ambassadors/prospects/:prospectId/status", async (req, res) => {
+app.put("/api/ambassadors/prospects/:prospectId/status", requireAuth, async (req, res) => {
   const { prospectId } = req.params;
   const { status, signedAmountFCFA, commissionRatePercent } = req.body;
 
@@ -4251,7 +4750,7 @@ app.put("/api/ambassadors/prospects/:prospectId/status", async (req, res) => {
 
     try {
       const { neonDbService } = await import("../src/db/neon-service.ts");
-      const commId = `COM-SAT-${Math.floor(100 + Math.random() * 900)}`;
+      const commId = `COM-SAT-${crypto.randomUUID().slice(0,8)}`;
       const newComm = {
         ambassadorId: prospect.ambassadorId,
         ambassadorName: prospect.ambassadorName || "Ambassadeur SEN AURA",
@@ -4313,7 +4812,7 @@ app.get("/api/ambassadors/commissions/:ambassadorId?", async (req, res) => {
 });
 
 // 7b. Update Commission Status (Admin)
-app.put("/api/ambassadors/commissions/:commId/status", async (req, res) => {
+app.put("/api/ambassadors/commissions/:commId/status", requireAuth, requireAdmin, async (req, res) => {
   const { commId } = req.params;
   const { status, paymentMethod, transactionRef } = req.body;
 
@@ -4334,7 +4833,7 @@ app.put("/api/ambassadors/commissions/:commId/status", async (req, res) => {
   if (status === "PAYE") {
     updates.paidAt = new Date().toISOString();
     updates.paymentMethod = paymentMethod || "WAVE";
-    updates.transactionRef = transactionRef || `TX-SAT-${Date.now()}`;
+    updates.transactionRef = transactionRef || `TX-SAT-${crypto.randomUUID().slice(0,8)}`;
   }
 
   try {
@@ -4365,7 +4864,7 @@ app.get("/api/ambassadors/payouts", async (_req, res) => {
 app.post("/api/ambassadors/payouts/request", async (req, res) => {
   const { ambassadorId = "SAT-AMB-0025", ambassadorName = "Mamadou Sow (Edu)", payoutMethod = "WAVE", payoutPhone = "+221 77 555 44 33", amountFCFA } = req.body;
 
-  const id = `PAY-SAT-${Math.floor(1000 + Math.random() * 9000)}`;
+  const id = `PAY-SAT-${crypto.randomUUID().slice(0,8)}`;
   const newPayout = {
     ambassadorId,
     ambassadorName,
@@ -4391,7 +4890,7 @@ app.post("/api/ambassadors/payouts/request", async (req, res) => {
 });
 
 // 8c. Process / Validate Payout (Admin Instant Wave/OM payout)
-app.post("/api/ambassadors/payouts/:payoutId/process", async (req, res) => {
+app.post("/api/ambassadors/payouts/:payoutId/process", requireAuth, requireAdmin, async (req, res) => {
   const { payoutId } = req.params;
   const { transactionRef, notes } = req.body;
 
@@ -4410,7 +4909,7 @@ app.post("/api/ambassadors/payouts/:payoutId/process", async (req, res) => {
 
   const updates: any = {
     status: "PAYE",
-    transactionRef: transactionRef || `WAVE-TX-${Math.floor(100000 + Math.random() * 900000)}`,
+    transactionRef: transactionRef || `WAVE-TX-${crypto.randomUUID().slice(0,8)}`,
     processedAt: new Date().toISOString(),
   };
   if (notes) updates.notes = notes;
@@ -4491,7 +4990,7 @@ app.get("/api/ambassadors/leaderboard", (_req, res) => {
 // ==========================================
 
 // Programs
-app.get("/api/programs", async (_req, res) => {
+app.get("/api/programs", requireAuth, async (_req, res) => {
   try {
     const { neonDbService } = await import("../src/db/neon-service.ts");
     const programs = await neonDbService.getAllPrograms();
@@ -4502,8 +5001,8 @@ app.get("/api/programs", async (_req, res) => {
   }
 });
 
-app.post("/api/programs", async (req, res) => {
-  const id = `PRG-${Date.now()}`;
+app.post("/api/programs", requireAuth, validateBody(schemas.programCreate), async (req, res) => {
+  const id = `PRG-${crypto.randomUUID().slice(0,8)}`;
   const program = {
     id,
     ...req.body,
@@ -4524,7 +5023,7 @@ app.post("/api/programs", async (req, res) => {
   res.status(500).json({ success: false, error: "Impossible de créer le programme" });
 });
 
-app.put("/api/programs/:id", async (req, res) => {
+app.put("/api/programs/:id", requireAuth, validateBody(schemas.programUpdate), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -4546,7 +5045,7 @@ app.put("/api/programs/:id", async (req, res) => {
   res.status(500).json({ success: false, error: "Impossible de mettre à jour le programme" });
 });
 
-app.delete("/api/programs/:id", async (req, res) => {
+app.delete("/api/programs/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -4574,8 +5073,8 @@ app.get("/api/solutions", async (_req, res) => {
   }
 });
 
-app.post("/api/solutions", async (req, res) => {
-  const id = `SOL-${Date.now()}`;
+app.post("/api/solutions", validateBody(schemas.solutionCreate), async (req, res) => {
+  const id = `SOL-${crypto.randomUUID().slice(0,8)}`;
   const solution = {
     id,
     ...req.body,
@@ -4596,7 +5095,7 @@ app.post("/api/solutions", async (req, res) => {
   res.status(500).json({ success: false, error: "Impossible de créer la solution" });
 });
 
-app.put("/api/solutions/:id", async (req, res) => {
+app.put("/api/solutions/:id", validateBody(schemas.solutionUpdate), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -4646,8 +5145,8 @@ app.get("/api/challenges", async (_req, res) => {
   }
 });
 
-app.post("/api/challenges", async (req, res) => {
-  const id = `CHL-${Date.now()}`;
+app.post("/api/challenges", validateBody(schemas.challengeCreate), async (req, res) => {
+  const id = `CHL-${crypto.randomUUID().slice(0,8)}`;
   const challenge = {
     id,
     ...req.body,
@@ -4670,7 +5169,7 @@ app.post("/api/challenges", async (req, res) => {
   res.status(500).json({ success: false, error: "Impossible de soumettre le défi" });
 });
 
-app.put("/api/challenges/:id", async (req, res) => {
+app.put("/api/challenges/:id", validateBody(schemas.challengeUpdate), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -4720,8 +5219,8 @@ app.get("/api/publications", async (_req, res) => {
   }
 });
 
-app.post("/api/publications", async (req, res) => {
-  const id = `PUB-${Date.now()}`;
+app.post("/api/publications", validateBody(schemas.publicationCreate), async (req, res) => {
+  const id = `PUB-${crypto.randomUUID().slice(0,8)}`;
   const publication = {
     id,
     ...req.body,
@@ -4743,7 +5242,7 @@ app.post("/api/publications", async (req, res) => {
   res.status(500).json({ success: false, error: "Impossible de créer la publication" });
 });
 
-app.put("/api/publications/:id", async (req, res) => {
+app.put("/api/publications/:id", validateBody(schemas.publicationUpdate), async (req, res) => {
   const { id } = req.params;
 
   try {

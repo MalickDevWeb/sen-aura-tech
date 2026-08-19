@@ -2,6 +2,7 @@
 // import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 // import { db } from "../database/firebase";
 import { UserRole, ProAccountStatus } from "../shared/contracts/types";
+import { authFetch } from "../lib/authFetch";
 
 export interface UserAccountSecurity {
   phone: string;
@@ -99,7 +100,7 @@ export class SecurityPinService {
 
     // 3. Vérification via l'API Backend & Neon PostgreSQL
     try {
-      const response = await fetch("/api/auth/check-uniqueness", {
+      const response = await authFetch("/api/auth/check-uniqueness", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -232,7 +233,7 @@ export class SecurityPinService {
 
       // Trigger notification dispatch on backend
       try {
-        fetch("/api/notifications/pro-receipt", {
+        authFetch("/api/notifications/pro-receipt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -274,7 +275,7 @@ export class SecurityPinService {
 
     // Sync in Neon PostgreSQL Database
     try {
-      fetch("/api/db/users/sync", {
+      authFetch("/api/db/users/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -377,7 +378,7 @@ export class SecurityPinService {
 
       // WhatsApp welcome/activation notification trigger
       try {
-        fetch("/api/whatsapp/send-template", {
+        authFetch("/api/whatsapp/send-template", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -393,7 +394,7 @@ export class SecurityPinService {
       // Email welcome/activation notification trigger
       if (params.email) {
         try {
-          fetch("/api/email/send", {
+          authFetch("/api/email/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -416,7 +417,7 @@ export class SecurityPinService {
 
     // 4. Sync status with backend
     try {
-      fetch(`/api/admin/users/${cleanPhone}/status`, {
+      authFetch(`/api/admin/users/${cleanPhone}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -464,69 +465,74 @@ export class SecurityPinService {
       return { success: false, error: "Veuillez entrer votre numéro de téléphone." };
     }
 
-    // Compte Super Admin officiel
-    if (cleanPhone === "771719013" && pin === "1732") {
-      const adminAccount: UserAccountSecurity = {
-        phone: `+221 ${cleanPhone}`,
-        cleanPhone: cleanPhone,
-        pinHash: await hashPin(pin),
-        fullName: "Administrateur SEN AURA",
-        role: "ADMIN",
-        region: "Dakar",
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
-        failedAttempts: 0,
-        lockedUntil: null,
-      };
-      return { success: true, account: adminAccount };
+    // 1. Appel sécurisé à l'API Backend pour valider via NeonDB
+    try {
+      const response = await authFetch("/api/auth/verify-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: cleanPhone, pin })
+      });
+      const data = await response.json();
+      
+      if (data.success && data.account) {
+        // Enregistrer/Mettre à jour le cache local avec le PIN hashé pour la persistance PWA
+        const hashedPin = await hashPin(pin);
+        const accountToCache: UserAccountSecurity = {
+          ...data.account,
+          pinHash: hashedPin,
+          createdAt: data.account.createdAt || new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+          failedAttempts: 0,
+          lockedUntil: null
+        };
+        try {
+          localStorage.setItem(`sat_user_sec_${cleanPhone}`, JSON.stringify(accountToCache));
+        } catch {}
+        return { success: true, account: accountToCache };
+      } else if (response.status === 401 || !data.success) {
+        return { success: false, error: data.error || "Code PIN incorrect." };
+      }
+    } catch (err) {
+      console.warn("Backend auth failed, falling back to local storage...", err);
     }
 
-    // Récupérer le compte
+    // 2. Fallback: Vérification Locale PWA (Mode hors-ligne)
     const { exists, account } = await this.checkAccountExists(cleanPhone);
-
     if (!exists || !account) {
       return {
         success: false,
-        error: "Ce numéro n'a pas encore de compte configuré avec un code PIN secret. Créez votre compte en définissant votre code PIN.",
+        error: "Ce numéro n'a pas encore de compte configuré. Créez votre compte en définissant votre code PIN.",
       };
     }
 
-    // Vérifier si le compte est temporairement verrouillé suite à trop d'échecs
     const now = Date.now();
     if (account.lockedUntil && account.lockedUntil > now) {
       const remainingSeconds = Math.ceil((account.lockedUntil - now) / 1000);
       return {
         success: false,
         locked: true,
-        error: `Compte temporairement verrouillé pour sécurité suite à 5 tentatives erronées. Réessayez dans ${remainingSeconds} secondes.`,
+        error: `Compte verrouillé. Réessayez dans ${remainingSeconds} secondes.`,
       };
     }
 
     const providedHash = await hashPin(pin);
     if (providedHash === account.pinHash) {
-      // Succès : réinitialiser les échecs
       account.failedAttempts = 0;
       account.lockedUntil = null;
       account.lastLoginAt = new Date().toISOString();
-
       try {
         localStorage.setItem(`sat_user_sec_${cleanPhone}`, JSON.stringify(account));
-        // Firestore update removed
       } catch {}
-
       return { success: true, account };
     }
 
-    // Échec : incrémenter les tentatives
     account.failedAttempts = (account.failedAttempts || 0) + 1;
-    let errorMsg = `Code PIN secret incorrect.`;
-
+    let errorMsg = `Code PIN incorrect.`;
     if (account.failedAttempts >= 5) {
-      account.lockedUntil = Date.now() + 60 * 1000; // Bloqué 1 minute
-      errorMsg = "5 tentatives incorrectes consécutives. Compte verrouillé pour 1 minute.";
+      account.lockedUntil = Date.now() + 60 * 1000;
+      errorMsg = "Compte verrouillé pour 1 minute.";
     } else {
-      const remaining = 5 - account.failedAttempts;
-      errorMsg = `Code PIN incorrect. Plus que ${remaining} tentative(s) avant verrouillage de sécurité.`;
+      errorMsg = `Code PIN incorrect. Plus que ${5 - account.failedAttempts} tentative(s).`;
     }
 
     try {

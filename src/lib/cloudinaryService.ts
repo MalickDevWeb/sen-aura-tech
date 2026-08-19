@@ -1,3 +1,4 @@
+import { authFetch } from "./authFetch";
 /**
  * Cloudinary Media & File Service
  * Uploads all images, videos, and PDF attachments to Cloudinary CDN,
@@ -44,7 +45,7 @@ export async function uploadMediaToCloudinary(
     }
 
     try {
-      const res = await fetch("/api/upload", {
+      const res = await authFetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

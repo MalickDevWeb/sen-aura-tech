@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { Download, Printer, Share2, Check, X, Award, ShieldCheck, Sparkles, ExternalLink, QrCode } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { downloadElementAsPDF } from "../lib/pdfGenerator";
+import { useDialog } from "../shared/components/CustomDialog";
 
 export interface CertificateData {
   id: string;
@@ -28,6 +29,7 @@ export const OfficialCertificateModal: React.FC<OfficialCertificateModalProps> =
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const certRef = useRef<HTMLDivElement>(null);
+  const { openDialog, dialog } = useDialog();
 
   if (!isOpen || !certificate) return null;
 
@@ -64,7 +66,11 @@ export const OfficialCertificateModal: React.FC<OfficialCertificateModalProps> =
       });
 
       if (!success) {
-        alert("Impossible de télécharger le PDF. Veuillez réessayer ou utiliser l'option Imprimer.");
+        openDialog({
+          type: "alert",
+          title: "Téléchargement impossible",
+          message: "Impossible de télécharger le PDF. Veuillez réessayer ou utiliser l'option Imprimer.",
+        });
       }
     } catch (error) {
       console.error("Erreur lors de la génération du PDF:", error);
@@ -86,6 +92,7 @@ export const OfficialCertificateModal: React.FC<OfficialCertificateModalProps> =
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      {dialog}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 max-w-5xl w-full space-y-6 shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200">
         
         {/* Modal Header Toolbar */}

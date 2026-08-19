@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, Users, FileText, ShoppingBag, GraduationCap, Server, Wrench, Headphones, Settings, LogOut } from "lucide-react";
+import { ShieldCheck, Users, FileText, ShoppingBag, GraduationCap, Server, Wrench, Headphones, Settings, LogOut, ShieldAlert } from "lucide-react";
 import { store } from "../../../database/store";
 import { ProfileSwitcher } from "../components/ProfileSwitcher";
 import { ProfileType } from "../../../shared/contracts/types";
@@ -33,7 +33,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         <div className="px-2.5 py-1.5 border-b border-slate-800 flex items-center justify-between gap-2">
-          <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest font-mono">SUPERVISION SUPERADMIN</p>
+          <p className="text-[10px] font-bold text-rose-400 uppercase font-mono tracking-wide">SUPERVISION SI</p>
           <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse shrink-0" />
         </div>
 
@@ -182,17 +182,31 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             <span className="truncate">Configuration SI</span>
           </span>
         </button>
+        <button
+          onClick={() => handleTabClick("security")}
+          className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+            adminTab === "security"
+              ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
+              : "text-slate-300 hover:bg-slate-800 hover:text-white"
+          }`}
+        >
+          <span className="flex items-center gap-2.5 min-w-0">
+            <ShieldAlert className={`w-4 h-4 shrink-0 ${adminTab === "security" ? "text-white" : "text-red-400"}`} />
+            <span className="truncate">Sécurité & Pare-Feu</span>
+          </span>
+          <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0" />
+        </button>
       </nav>
       </div>
 
-      <div className="pt-3 border-t border-slate-800/80">
+      <div className="pt-2 border-t border-slate-800/80">
         <button
           onClick={() => {
             store.logout();
             onNavigate?.("home");
             onItemClick?.();
           }}
-          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all border border-rose-500/20"
+          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all"
         >
           <LogOut className="w-4 h-4 shrink-0 text-rose-400" />
           <span>Déconnexion</span>

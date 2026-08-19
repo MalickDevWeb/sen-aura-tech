@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from "react";
-import { AlertTriangle, Info, X } from "lucide-react";
+import React from "react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, Check, Info, X, ShieldAlert, Sparkles } from "lucide-react";
 
 export interface ConfirmConfig {
   title?: string;
@@ -25,7 +26,7 @@ export const ActionConfirmModal: React.FC<Props> = ({ config, onClose }) => {
     message,
     type = "danger",
     isAlert = false,
-    confirmText = isAlert ? "OK" : "Confirmer",
+    confirmText = isAlert ? "OK, compris" : "Confirmer",
     cancelText = "Annuler",
     onConfirm,
     onCancel,
@@ -42,45 +43,174 @@ export const ActionConfirmModal: React.FC<Props> = ({ config, onClose }) => {
   };
 
   const isDanger = type === "danger";
+  const isSuccess = type === "success";
+  const isWarning = type === "warning";
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className={`p-4 ${isDanger ? "bg-rose-500/10" : "bg-blue-500/10"} flex items-center gap-3 border-b border-slate-800/50`}>
-          <div className={`p-2 rounded-xl ${isDanger ? "bg-rose-500/20 text-rose-400" : "bg-blue-500/20 text-blue-400"}`}>
-            {isDanger ? <AlertTriangle className="w-6 h-6" /> : <Info className="w-6 h-6" />}
+  const accentColor = isDanger
+    ? { from: "#ef4444", to: "#dc2626", glow: "rgba(239,68,68,0.35)", bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.3)" }
+    : isSuccess
+    ? { from: "#22c55e", to: "#16a34a", glow: "rgba(34,197,94,0.35)", bg: "rgba(34,197,94,0.1)", border: "rgba(34,197,94,0.3)" }
+    : isWarning
+    ? { from: "#f59e0b", to: "#d97706", glow: "rgba(245,158,11,0.35)", bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.3)" }
+    : { from: "#3b82f6", to: "#2563eb", glow: "rgba(59,130,246,0.35)", bg: "rgba(59,130,246,0.1)", border: "rgba(59,130,246,0.3)" };
+
+  const Icon = isDanger ? ShieldAlert : isSuccess ? Check : isWarning ? AlertTriangle : Info;
+
+  return createPortal(
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) handleCancel(); }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 999999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "16px",
+        background: "rgba(2,6,23,0.82)",
+        backdropFilter: "blur(10px)",
+        animation: "satFadeIn 0.18s ease",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "400px",
+          background: "linear-gradient(160deg, #0d1525 0%, #111827 100%)",
+          borderRadius: "22px",
+          border: `1px solid ${accentColor.border}`,
+          boxShadow: `0 30px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.05), 0 0 40px ${accentColor.glow}`,
+          overflow: "hidden",
+          animation: "satSlideUp 0.22s cubic-bezier(0.34,1.56,0.64,1)",
+        }}
+      >
+        {/* Top accent bar */}
+        <div style={{
+          height: "3px",
+          background: `linear-gradient(90deg, ${accentColor.from}, ${accentColor.to}, transparent)`,
+        }} />
+
+        {/* Header */}
+        <div style={{
+          padding: "20px 24px 0",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+        }}>
+          <div style={{
+            width: "44px",
+            height: "44px",
+            borderRadius: "14px",
+            background: accentColor.bg,
+            border: `1px solid ${accentColor.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <Icon size={20} color={accentColor.from} />
           </div>
-          <h3 className="font-black text-white text-lg tracking-tight">{title}</h3>
-          <button onClick={handleCancel} className="ml-auto p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6">
-          <p className="text-slate-300 text-sm leading-relaxed">{message}</p>
-        </div>
-
-        <div className="p-4 bg-slate-950 flex justify-end gap-3 border-t border-slate-800">
-          {!isAlert && (
-            <button
-              onClick={handleCancel}
-              className="px-4 py-2 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors text-sm"
-            >
-              {cancelText}
-            </button>
-          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#fff", letterSpacing: "-0.01em" }}>
+              {title}
+            </h3>
+            <p style={{ margin: "2px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.35)", fontFamily: "monospace" }}>
+              SEN AURA TECH · Back‑Office
+            </p>
+          </div>
           <button
-            onClick={handleConfirm}
-            className={`px-6 py-2 rounded-xl font-bold text-white shadow-lg transition-all text-sm ${
-              isDanger
-                ? "bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 shadow-rose-500/20"
-                : "bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 shadow-blue-500/20"
-            }`}
+            onClick={handleCancel}
+            style={{
+              width: "30px",
+              height: "30px",
+              borderRadius: "8px",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "rgba(255,255,255,0.4)",
+              flexShrink: 0,
+            }}
           >
-            {confirmText}
+            <X size={14} />
           </button>
+        </div>
+
+        {/* Message */}
+        <div style={{ padding: "16px 24px 24px" }}>
+          <div style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.07)",
+            borderRadius: "12px",
+            padding: "14px 16px",
+            marginBottom: "20px",
+          }}>
+            <p style={{
+              margin: 0,
+              fontSize: "13px",
+              color: "rgba(255,255,255,0.75)",
+              lineHeight: 1.65,
+            }}>
+              {message}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+            {!isAlert && (
+              <button
+                onClick={handleCancel}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "10px",
+                  background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(255,255,255,0.6)",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+                onMouseOver={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
+              >
+                {cancelText}
+              </button>
+            )}
+            <button
+              onClick={handleConfirm}
+              style={{
+                padding: "10px 24px",
+                borderRadius: "10px",
+                background: `linear-gradient(135deg, ${accentColor.from}, ${accentColor.to})`,
+                border: "none",
+                color: "#fff",
+                fontSize: "13px",
+                fontWeight: 800,
+                cursor: "pointer",
+                boxShadow: `0 4px 16px ${accentColor.glow}`,
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "all 0.15s",
+              }}
+              onMouseOver={e => (e.currentTarget.style.transform = "translateY(-1px)")}
+              onMouseOut={e => (e.currentTarget.style.transform = "translateY(0)")}
+            >
+              {isSuccess && <Sparkles size={14} />}
+              {confirmText}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <style>{`
+        @keyframes satFadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes satSlideUp { from { opacity: 0; transform: translateY(24px) scale(0.96) } to { opacity: 1; transform: translateY(0) scale(1) } }
+      `}</style>
+    </div>,
+    document.body
   );
 };

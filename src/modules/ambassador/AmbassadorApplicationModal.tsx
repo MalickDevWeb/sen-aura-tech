@@ -27,6 +27,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { AmbassadorApplicationDTO } from "../../shared/contracts/types";
+import { authFetch } from "../../lib/authFetch";
 
 interface AmbassadorApplicationModalProps {
   isOpen: boolean;
@@ -150,7 +151,7 @@ export const AmbassadorApplicationModal: React.FC<AmbassadorApplicationModalProp
         motivation: formData.motivation || "Rejoindre le réseau d'ambassadeurs SEN AURA TECH et promouvoir des projets technologiques."
       };
 
-      const res = await fetch("/api/ambassadors/apply", {
+      const res = await authFetch("/api/ambassadors/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

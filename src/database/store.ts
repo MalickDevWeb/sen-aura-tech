@@ -1,6 +1,7 @@
 import { UserDTO, QuoteRequestDTO, BookingDTO, CartItemDTO, OrderDTO, TicketDTO, UserRole, ProfileType, ProfileSubscriptionDTO, UserProfileDataDTO, ProductDTO } from "../shared/contracts/types";
 import { eventBus, EVENTS } from "../shared/events/event-bus";
 import { PROFILES_METADATA, buildDefaultUserProfiles } from "../config/profilesConfig";
+import { authFetch } from "../lib/authFetch";
 // Firestore imports removed
 
 class Store {
@@ -38,12 +39,12 @@ class Store {
     // Synchronisation Neon PostgreSQL
     try {
       const [quotesRes, bookingsRes, ordersRes, productsRes, coursesRes, providersRes] = await Promise.all([
-        fetch("/api/db/quotes").then((r) => r.json()).catch(() => ({ quotes: [] })),
-        fetch("/api/db/bookings").then((r) => r.json()).catch(() => ({ bookings: [] })),
-        fetch("/api/db/orders").then((r) => r.json()).catch(() => ({ orders: [] })),
-        fetch("/api/db/products").then((r) => r.json()).catch(() => ({ products: [] })),
-        fetch("/api/db/courses").then((r) => r.json()).catch(() => ({ courses: [] })),
-        fetch("/api/db/providers").then((r) => r.json()).catch(() => ({ providers: [] })),
+        authFetch("/api/db/quotes").then((r) => r.json()).catch(() => ({ quotes: [] })),
+        authFetch("/api/db/bookings").then((r) => r.json()).catch(() => ({ bookings: [] })),
+        authFetch("/api/db/orders").then((r) => r.json()).catch(() => ({ orders: [] })),
+        authFetch("/api/db/products").then((r) => r.json()).catch(() => ({ products: [] })),
+        authFetch("/api/db/courses").then((r) => r.json()).catch(() => ({ courses: [] })),
+        authFetch("/api/db/providers").then((r) => r.json()).catch(() => ({ providers: [] })),
       ]);
 
       if (quotesRes?.quotes && quotesRes.quotes.length > 0) {
@@ -108,17 +109,56 @@ class Store {
     this.currentUser = user;
     this.isLoggedIn = true;
 
-    // Sync to Neon PostgreSQL
+    // Sync to Neon PostgreSQL — endpoint returns a JWT token (first login or refresh)
     try {
-      fetch("/api/db/users/sync", {
+      const existingToken = localStorage.getItem("senaura_auth_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (existingToken) headers.Authorization = `Bearer ${existingToken}`;
+      authFetch("/api/db/users/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ user, pin }),
-      }).catch(() => null);
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          // Store the token returned by the server (first login generates a new one)
+          if (data?.token && data.token !== existingToken) {
+            localStorage.setItem("senaura_auth_token", data.token);
+          }
+        })
+        .catch(() => null);
     } catch {}
 
     eventBus.publish(EVENTS.ROLE_CHANGED, role);
     eventBus.publish("PROFILE_SWITCHED", (role as ProfileType) || "CLIENT");
+  }
+
+  setAuthToken(token: string | null) {
+    if (token) localStorage.setItem("senaura_auth_token", token);
+    else localStorage.removeItem("senaura_auth_token");
+  }
+
+  getAuthToken(): string | null {
+    try { return localStorage.getItem("senaura_auth_token"); } catch { return null; }
+  }
+
+  logout() {
+    this.isLoggedIn = false;
+    this.currentUser = {
+      id: "guest",
+      fullName: "Visiteur / Invité",
+      email: "invite@senauratech.sn",
+      phone: "+221",
+      role: "CLIENT",
+      activeProfile: "CLIENT",
+      profiles: buildDefaultUserProfiles({ id: "guest", fullName: "Visiteur / Invité", role: "CLIENT" }),
+      region: "Dakar",
+      verified: false,
+      createdAt: new Date().toISOString(),
+    };
+    localStorage.removeItem("senaura_auth_token");
+    eventBus.publish(EVENTS.ROLE_CHANGED, "CLIENT");
+    eventBus.publish("PROFILE_SWITCHED", "CLIENT");
   }
 
   isProFreeTrialActive(): boolean {
@@ -285,24 +325,6 @@ class Store {
     this.switchProfile(role as ProfileType);
   }
 
-  logout() {
-    this.isLoggedIn = false;
-    this.currentUser = {
-      id: "guest",
-      fullName: "Visiteur / Invité",
-      email: "invite@senauratech.sn",
-      phone: "+221",
-      role: "CLIENT",
-      activeProfile: "CLIENT",
-      profiles: buildDefaultUserProfiles({ id: "guest", fullName: "Visiteur / Invité", role: "CLIENT" }),
-      region: "Dakar",
-      verified: false,
-      createdAt: new Date().toISOString(),
-    };
-    eventBus.publish(EVENTS.ROLE_CHANGED, "CLIENT");
-    eventBus.publish("PROFILE_SWITCHED", "CLIENT");
-  }
-
   // Devis & Projets
   saveQuoteDraft(draft: Partial<QuoteRequestDTO>) {
     try {
@@ -330,7 +352,7 @@ class Store {
     // saveQuoteToFirestore(quote);
 
     // Save to Neon PostgreSQL & In-Memory backend
-    fetch("/api/quotes/submit", {
+    authFetch("/api/quotes/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(quote),
@@ -343,11 +365,12 @@ class Store {
     const idx = this.quotes.findIndex((q) => q.id === id);
     if (idx >= 0) {
       this.quotes[idx] = { ...this.quotes[idx], ...updates };
-      // saveQuoteToFirestore(this.quotes[idx]);
-      
-      fetch(`/api/quotes/${id}/proposal`, {
+      const token = this.getAuthToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      authFetch(`/api/quotes/${id}/proposal`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(updates),
       }).catch(() => null);
 
@@ -384,7 +407,10 @@ class Store {
   deleteQuote(id: string) {
     this.quotes = this.quotes.filter((q) => q.id !== id);
     try {
-      fetch(`/api/quotes/${id}`, { method: "DELETE" }).catch(() => null);
+      const token = this.getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      authFetch(`/api/quotes/${id}`, { method: "DELETE", headers }).catch(() => null);
     } catch {}
   }
 
@@ -394,7 +420,7 @@ class Store {
     // saveBookingToFirestore(booking);
 
     // Save to Neon PostgreSQL
-    fetch("/api/db/bookings", {
+    authFetch("/api/db/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(booking),
@@ -433,7 +459,7 @@ class Store {
     // saveOrderToFirestore(order);
 
     // Save to Neon PostgreSQL
-    fetch("/api/db/orders", {
+    authFetch("/api/db/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(order),

@@ -35,6 +35,7 @@ import { generateExpressProductWhatsAppMsg, redirectToWhatsAppPayment } from "..
 import { MessageCircle } from "lucide-react";
 import { useSWRInstant } from "../../lib/swr-cache";
 import { OptimizedImage } from "../../shared/components/OptimizedImage";
+import { authFetch } from "../../lib/authFetch";
 
 interface BoutiqueViewProps {
   onOpenCart: () => void;
@@ -52,7 +53,7 @@ export const BoutiqueView: React.FC<BoutiqueViewProps> = ({ onOpenCart, currency
     "boutique_catalog_products",
     async () => {
       try {
-        const res = await fetch("/api/db/products");
+        const res = await authFetch("/api/db/products");
         const json = await res.json();
         if (json?.products) {
           return json.products;
@@ -70,7 +71,7 @@ export const BoutiqueView: React.FC<BoutiqueViewProps> = ({ onOpenCart, currency
       if (e?.detail) {
         mutate((curr) => [e.detail, ...curr.filter((p) => p.id !== e.detail.id)], true);
       } else {
-        fetch("/api/db/products")
+        authFetch("/api/db/products")
           .then((r) => r.json())
           .then((j) => {
             if (j?.products) mutate(j.products, false);

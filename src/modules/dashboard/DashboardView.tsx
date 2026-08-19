@@ -61,6 +61,7 @@ import {
 } from "lucide-react";
 import { store } from "../../database/store";
 import { ActionConfirmModal, ConfirmConfig } from "../../shared/components/ActionConfirmModal";
+import { CustomDialog } from "../../shared/components/CustomDialog";
 import { formatCurrency } from "../../config/constants";
 import { UserRole, QuoteRequestDTO } from "../../shared/contracts/types";
 
@@ -78,6 +79,7 @@ import { VendorProductMediaModal } from "../vendor/VendorProductMediaModal";
 import { FormateurCourseUploadForm } from "../formateur/FormateurCourseUploadForm";
 import { ProPortfolioUploadForm } from "../pro/ProPortfolioUploadForm";
 import { SuperAdminSettingsManager } from "./components/SuperAdminSettingsManager";
+import { SecurityFirewallPanel } from "./components/SecurityFirewallPanel";
 import { ProProfileEditor } from "./components/ProProfileEditor";
 import { FormateurProfileEditor } from "./components/FormateurProfileEditor";
 import { VendeurProfileEditor } from "./components/VendeurProfileEditor";
@@ -88,6 +90,7 @@ import { PROFILES_METADATA } from "../../config/profilesConfig";
 import { ProfileSwitcher } from "./components/ProfileSwitcher";
 import { ActivateProfileModal } from "./components/ActivateProfileModal";
 import { ProfileSubscriptionCard } from "./components/ProfileSubscriptionCard";
+import { authFetch } from "../../lib/authFetch";
 
 interface DashboardViewProps {
   currency: "FCFA" | "EUR";
@@ -103,6 +106,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenAuthModal,
 }) => {
   const [role, setRole] = useState<UserRole>(store.currentUser.role);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(store.isLoggedIn);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
   const [activationInitialProfile, setActivationInitialProfile] = useState<ProfileType | undefined>(undefined);
@@ -113,11 +117,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   useEffect(() => {
+    // Sync on mount in case already logged in
+    setIsLoggedIn(store.isLoggedIn);
     setRole(store.currentUser.role);
+
     const unsubRole = eventBus.subscribe(EVENTS.ROLE_CHANGED, (newRole) => {
+      setIsLoggedIn(store.isLoggedIn);
       setRole(newRole as UserRole);
     });
     const unsubProfile = eventBus.subscribe("PROFILE_SWITCHED", (newProfile) => {
+      setIsLoggedIn(store.isLoggedIn);
       setRole(newProfile as UserRole);
     });
     const unsubToggle = eventBus.subscribe("TOGGLE_DASHBOARD_SIDEBAR", () => {
@@ -283,12 +292,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [adminPros, setAdminPros] = useState<any[]>([]);
   const [adminProducts, setAdminProducts] = useState<any[]>([]);
   const [confirmConfig, setConfirmConfig] = useState<ConfirmConfig | null>(null);
+
+  // ---- Premium Prompt Dialog (replaces native browser prompt()) ----
+  const [promptConfig, setPromptConfig] = useState<{
+    title: string;
+    message: string;
+    placeholder?: string;
+    defaultValue?: string;
+    resolve: (v: string | undefined) => void;
+  } | null>(null);
+
+  const askPrompt = (title: string, message: string, placeholder?: string, defaultValue?: string): Promise<string | undefined> => {
+    return new Promise((resolve) => {
+      setPromptConfig({ title, message, placeholder, defaultValue: defaultValue || "", resolve });
+    });
+  };
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("senaura_auth_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const api = (path: string, options: RequestInit = {}) => {
+    const token = localStorage.getItem("senaura_auth_token");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    };
+    return fetch(path, { ...options, headers });
+  };
   const [adminOrders, setAdminOrders] = useState(store.orders);
   const [proSearch, setProSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
 
   useEffect(() => {
-    fetch("/api/admin/users")
+    authFetch("/api/db/users")
       .then(r => r.json())
       .then(data => {
         if (data.success && Array.isArray(data.users) && data.users.length > 0) {
@@ -306,31 +345,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       .catch(() => {});
 
     // Load admin pros from DB
-    fetch("/api/db/providers")
+    authFetch("/api/db/providers")
       .then(r => r.json())
       .then(data => { if (data.success && Array.isArray(data.providers)) setAdminPros(data.providers); })
       .catch(() => {});
 
     // Load admin products from DB
-    fetch("/api/db/products")
+    authFetch("/api/db/products")
       .then(r => r.json())
       .then(data => { if (data.success && Array.isArray(data.products)) setAdminProducts(data.products); })
       .catch(() => {});
 
     // Load admin orders from DB
-    fetch("/api/db/orders")
+    authFetch("/api/db/orders")
       .then(r => r.json())
       .then(data => { if (data.success && Array.isArray(data.orders)) setAdminOrders(data.orders); })
       .catch(() => {});
 
     const loadVendorProducts = () => {
-      fetch("/api/vendor/products")
+      authFetch("/api/vendor/products")
         .then(r => r.json())
         .then(data => {
           if (data.success && Array.isArray(data.products) && data.products.length > 0) {
             setVendeurProducts(data.products);
           } else {
-            fetch("/api/db/products")
+            authFetch("/api/db/products")
               .then(r => r.json())
               .then(dbData => {
                 if (dbData.success && Array.isArray(dbData.products) && dbData.products.length > 0) {
@@ -344,13 +383,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
 
     // Load vendeur orders from DB
-    fetch("/api/db/orders")
+    authFetch("/api/db/orders")
       .then(r => r.json())
       .then(data => { if (data.success && Array.isArray(data.orders)) setVendeurOrders(data.orders); })
       .catch(() => {});
 
     const loadFormateurCourses = () => {
-      fetch("/api/db/courses")
+      authFetch("/api/db/courses")
         .then(r => r.json())
         .then(data => {
           if (data.success && Array.isArray(data.courses)) {
@@ -367,7 +406,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
 
     // Load formateur students from DB
-    fetch("/api/db/users")
+    authFetch("/api/db/users")
       .then(r => r.json())
       .then(data => {
         if (data.success && Array.isArray(data.users)) {
@@ -435,7 +474,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     (role === "VENDEUR" && vendeurTab === "stock") ||
     (role === "ADMIN" && adminTab === "overview");
 
-  if (!store.isLoggedIn) {
+  if (!isLoggedIn) {
     return (
       <div className="max-w-md mx-auto my-16 p-8 rounded-3xl bg-slate-900 border border-slate-800 text-center space-y-6 shadow-2xl animate-in fade-in duration-300">
         <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
@@ -2170,12 +2209,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span>Prix</span>
                       </button>
 
-                      <button
-                        onClick={() => {
-                          fetch(`/api/trainer/courses/${c.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ status: c.status === "Publié" ? "Brouillon" : "Publié" }) }).catch(()=>{});
-                              fetch(`/api/admin/courses/${c.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ status: c.status === "Publié" ? "Brouillon" : "Publié" }) }).catch(()=>{});
-                              setFormateurCourses(formateurCourses.map(item => item.id === c.id ? { ...item, status: item.status === "Publié" ? "Brouillon" : "Publié" } : item));
-                        }}
+                       <button
+                         onClick={() => {
+                           authFetch(`/api/db/courses/${c.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ status: c.status === "Publié" ? "Brouillon" : "Publié" }) }).catch(()=>{});
+                           setFormateurCourses(formateurCourses.map(item => item.id === c.id ? { ...item, status: item.status === "Publié" ? "Brouillon" : "Publié" } : item));
+                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[11px] font-medium flex items-center gap-1"
                       >
                         {c.status === "Publié" ? <XCircle className="w-3.5 h-3.5 text-amber-400" /> : <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />}
@@ -2185,12 +2223,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <button
                         onClick={() => {
                           setConfirmConfig({
-                                message: `Supprimer la formation "${c.title}" ?`,
-                                onConfirm: () => {
-                                  fetch(`/api/trainer/courses/${c.id}`, { method: "DELETE" }).catch(()=>{});
-                                  fetch(`/api/admin/courses/${c.id}`, { method: "DELETE" }).catch(()=>{});
-                                  setFormateurCourses(formateurCourses.filter(item => item.id !== c.id));
-                                }
+                                 message: `Supprimer la formation "${c.title}" ?`,
+                                 onConfirm: () => {
+                                   authFetch(`/api/db/courses/${c.id}`, { method: "DELETE" }).catch(()=>{});
+                                   setFormateurCourses(formateurCourses.filter(item => item.id !== c.id));
+                                 }
                               })
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-[11px] font-medium flex items-center gap-1"
@@ -2310,7 +2347,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   duration: newCourse.duration || "25 Heures",
                 };
                 try {
-                  await fetch("/api/db/courses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(createdCourse) });
+                  await authFetch("/api/db/courses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(createdCourse) });
                 } catch (e) {}
                 setFormateurCourses([createdCourse, ...formateurCourses]);
                 setFormateurTab("courses");
@@ -2693,7 +2730,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <span className="text-slate-400 text-[10px]">Stock:</span>
                           <button
                             onClick={() => {
-                              fetch(`/api/vendor/products/${p.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ stock: Math.max(0, p.stock - 1) }) }).catch(()=>{});
+                              authFetch(`/api/vendor/products/${p.id}`, { method: "PUT", headers: {"Content-Type":"application/json","Authorization":`Bearer ${localStorage.getItem("senaura_auth_token")||""}`}, body: JSON.stringify({ stock: Math.max(0, p.stock - 1) }) }).catch(()=>{});
                               setVendeurProducts(vendeurProducts.map(item => item.id === p.id ? { ...item, stock: Math.max(0, item.stock - 1) } : item));
                             }}
                             className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-xs"
@@ -2703,7 +2740,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <span className="font-mono font-bold text-white px-1.5">{p.stock}</span>
                           <button
                             onClick={() => {
-                              fetch(`/api/vendor/products/${p.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ stock: p.stock + 1 }) }).catch(()=>{});
+                              authFetch(`/api/vendor/products/${p.id}`, { method: "PUT", headers: {"Content-Type":"application/json","Authorization":`Bearer ${localStorage.getItem("senaura_auth_token")||""}`}, body: JSON.stringify({ stock: p.stock + 1 }) }).catch(()=>{});
                               setVendeurProducts(vendeurProducts.map(item => item.id === p.id ? { ...item, stock: item.stock + 1 } : item));
                             }}
                             className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-xs"
@@ -2727,7 +2764,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               setConfirmConfig({
                                 message: `Supprimer définitivement "${p.name}" du catalogue ?`,
                                 onConfirm: () => {
-                                  fetch(`/api/vendor/products/${p.id}`, { method: "DELETE" }).catch(()=>{});
+                                   authFetch(`/api/vendor/products/${p.id}`, { method: "DELETE", headers: {"Authorization":`Bearer ${localStorage.getItem("senaura_auth_token")||""}`} }).catch(()=>{});
                                   setVendeurProducts(vendeurProducts.filter(item => item.id !== p.id));
                                 }
                               })
@@ -2752,7 +2789,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               currency={currency}
               onProductCreated={async (newProduct) => {
                 try {
-                  await fetch("/api/db/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newProduct) });
+                  await authFetch("/api/db/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newProduct) });
                 } catch (e) {}
                 setVendeurProducts([newProduct, ...vendeurProducts]);
                 setVendeurTab("stock");
@@ -3036,13 +3073,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
 
                 <button
-                  onClick={() => {
-                    const title = prompt("Titre du projet / Devis SI :");
+                  onClick={async () => {
+                    const title = await askPrompt("Nouveau Projet", "Titre du projet / Devis SI :", "Ex: Audit infrastructure IT");
                     if (!title) return;
-                    const client = prompt("Nom du client / Entreprise :", "Sénégal Tech SARL");
+                    const client = await askPrompt("Nouveau Projet", "Nom du client / Entreprise :", "Sénégal Tech SARL", "Sénégal Tech SARL");
                     if (!client) return;
-                    const phone = prompt("Téléphone du client :", "+221 77 000 11 22");
-                    const budget = prompt("Budget estimé (FCFA) :", "1500000");
+                    const phone = await askPrompt("Nouveau Projet", "Téléphone du client :", "+221 77 000 11 22", "+221 77 000 11 22");
+                    const budget = await askPrompt("Nouveau Projet", "Budget estimé (FCFA) :", "1500000", "1500000");
 
                     const newQuote: QuoteRequestDTO = {
                       id: `SAT-DEV-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -3099,23 +3136,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
               {/* Quotes Cards List */}
               <div className="space-y-3.5 pt-1">
-                {adminQuotes
-                  .filter(q => {
+                {(() => {
+                  const filteredQuotes = adminQuotes.filter(q => {
                     if (adminQuoteFilter === "ALL") return true;
                     if (adminQuoteFilter === "EN_ATTENTE") return q.status === "EN_ATTENTE" || (q.status as string) === "EN_ETUDE";
                     if (adminQuoteFilter === "PROPOSITION_ENVOYEE") return q.status === "PROPOSITION_ENVOYEE";
                     if (adminQuoteFilter === "VALIDE") return q.status === "VALIDE" || (q.status as string) === "Validé";
                     if (adminQuoteFilter === "REFUSE") return q.status === "REFUSE";
                     return true;
-                  })
-                  .map((q) => {
-                    const isPending = q.status === "EN_ATTENTE" || (q.status as string) === "EN_ETUDE";
-                    const isPublished = q.status === "PROPOSITION_ENVOYEE" || q.status === "VALIDE" || (q.status as string) === "Validé";
+                  });
 
+                  if (filteredQuotes.length === 0) {
                     return (
-                      <div
-                        key={q.id}
-                        className={`p-5 rounded-2xl border transition-all space-y-3 ${
+                      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
+                          <FileText className="w-8 h-8 text-amber-500/50" />
+                        </div>
+                        <div>
+                          <p className="text-white font-bold text-base">Aucun devis trouvé</p>
+                          <p className="text-slate-400 text-sm mt-1">
+                            {adminQuoteFilter === "ALL"
+                              ? "Les demandes de devis soumises par les clients apparaîtront ici."
+                              : "Aucun devis ne correspond à ce filtre pour le moment."}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setAdminQuoteFilter("ALL")}
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all border border-slate-700"
+                        >
+                          Voir tous les devis
+                        </button>
+                      </div>
+                    );
+                  }
+
+                   const seen = new Set<string>();
+                   const uniqueQuotes = filteredQuotes.filter((q) => {
+                     if (seen.has(q.id)) return false;
+                     seen.add(q.id);
+                     return true;
+                   });
+
+                   return uniqueQuotes.map((q, index) => {
+                     const isPending = q.status === "EN_ATTENTE" || (q.status as string) === "EN_ETUDE";
+                     const isPublished = q.status === "PROPOSITION_ENVOYEE" || q.status === "VALIDE" || (q.status as string) === "Validé";
+
+                     return (
+                       <div
+                         key={`${q.id}-${index}`}
+                         className={`p-5 rounded-2xl border transition-all space-y-3 ${
                           isPublished
                             ? "bg-slate-950 border-emerald-500/30"
                             : isPending
@@ -3194,7 +3263,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {/* Action Buttons */}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            {/* Primary Button: Open Proposal Builder */}
                             <button
                               onClick={() => setSelectedQuoteForProposal(q)}
                               className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/10 transition-all cursor-pointer"
@@ -3203,7 +3271,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               <span>{isPending ? "Établir & Publier la Proposition" : "Modifier la Proposition"}</span>
                             </button>
 
-                            {/* Download PDF button for Admin preview */}
                             <button
                               onClick={() => {
                                 exportQuotePDF({
@@ -3245,12 +3312,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <button
                             onClick={() => {
                               setConfirmConfig({
-                                message: `Supprimer définitivement la demande de devis ${q.id} ?`,
-                                onConfirm: () => {
-                                  store.deleteQuote(q.id);
-                                fetch(`/api/admin/quotes/${q.id}`, { method: "DELETE" }).catch(()=>{});
-                                setAdminQuotes(adminQuotes.filter(item => item.id !== q.id));
-                                }
+                                 message: `Supprimer définitivement la demande de devis ${q.id} ?`,
+                                  onConfirm: () => {
+                                    store.deleteQuote(q.id);
+                                    setAdminQuotes(adminQuotes.filter(item => item.id !== q.id));
+                                  }
                               })
                             }}
                             className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 transition-colors cursor-pointer"
@@ -3261,7 +3327,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </div>
                       </div>
                     );
-                  })}
+                  });
+                })()}
               </div>
 
               {/* Admin Quote Proposal Builder & Publishing Modal */}
@@ -3310,13 +3377,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   <button
                     onClick={async () => {
-                      const name = prompt("Nom complet de l'utilisateur / Formateur :");
+                      const name = await askPrompt("Nouvel Utilisateur", "Nom complet de l'utilisateur / Formateur :");
                       if (!name) return;
-                      const phone = prompt("Numéro de téléphone (ex: 77 123 45 67) :");
+                      const phone = await askPrompt("Nouvel Utilisateur", "Numéro de téléphone (ex: 77 123 45 67) :");
                       if (!phone) return;
-                      const email = prompt("Email de l'utilisateur (ex: contact@domaine.sn) :");
+                      const email = await askPrompt("Nouvel Utilisateur", "Email de l'utilisateur (ex: contact@domaine.sn) :");
                       if (!email) return;
-                      const roleInput = (prompt("Rôle (CLIENT, FORMATEUR, VENDEUR, PROFESSIONAL, ADMIN) :", "FORMATEUR") || "FORMATEUR").toUpperCase() as UserRole;
+                      const roleRaw = await askPrompt("Nouvel Utilisateur", "Rôle (CLIENT, FORMATEUR, VENDEUR, PROFESSIONAL, ADMIN) :", "FORMATEUR", "FORMATEUR");
+                      const roleInput = (roleRaw || "FORMATEUR").toUpperCase() as UserRole;
                       
                       const cleanPhoneDigits = phone.replace(/\D/g, "");
                       const normPhone = cleanPhoneDigits.startsWith("221") && cleanPhoneDigits.length === 12 ? cleanPhoneDigits.slice(3) : cleanPhoneDigits;
@@ -3338,7 +3406,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                       // Vérification API Backend & Base de données
                       try {
-                        const checkRes = await fetch("/api/auth/check-uniqueness", {
+                        const checkRes = await authFetch("/api/auth/check-uniqueness", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ phone, email: normEmail })
@@ -3361,20 +3429,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         paymentStatus: roleInput === "CLIENT" ? "Accès Gratuit" : "En attente (25,000 FCFA/mois)"
                       };
 
-                      fetch(`/api/admin/users`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(newUser) }).catch(()=>{});
+                      authFetch(`/api/db/users/sync`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(newUser) }).catch(()=>{});
                       setAdminUsers([newUser, ...adminUsers]);
 
                       // Persist to backend
                       try {
-                        await fetch("/api/admin/users", {
+                        await authFetch("/api/db/users/sync", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
+                            id: newUser.id,
                             fullName: name,
                             email: normEmail,
                             phone: newUser.phone,
                             role: roleInput,
-                            city: "Dakar"
+                            region: "Dakar",
+                            pin: "1234"
                           })
                         });
                       } catch {}
@@ -3448,11 +3518,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           {/* Role Selector */}
                           <select
                             value={u.role}
-                            onChange={(e) => {
-                              const newRole = e.target.value as UserRole;
-                              fetch(`/api/admin/users/${u.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ role: newRole }) }).catch(()=>{});
-                              setAdminUsers(adminUsers.map(item => item.id === u.id ? { ...item, role: newRole } : item));
-                            }}
+                             onChange={(e) => {
+                               const newRole = e.target.value as UserRole;
+                               const token = localStorage.getItem("senaura_auth_token");
+                               const headers: Record<string, string> = { "Content-Type": "application/json" };
+                               if (token) headers.Authorization = `Bearer ${token}`;
+                               authFetch(`/api/admin/users/${u.id}`, { method: "PUT", headers, body: JSON.stringify({ role: newRole }) }).catch(()=>{});
+                               setAdminUsers(adminUsers.map(item => item.id === u.id ? { ...item, role: newRole } : item));
+                             }}
                             className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-amber-400 focus:outline-none"
                           >
                             <option value="CLIENT">CLIENT</option>
@@ -3547,11 +3620,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <button
                             onClick={() => {
                               setConfirmConfig({
-                                message: `Supprimer l'utilisateur "${u.name}" ?`,
-                                onConfirm: () => {
-                                  fetch(`/api/admin/users/${u.id}`, { method: "DELETE" }).catch(()=>{});
-                                  setAdminUsers(adminUsers.filter(item => item.id !== u.id));
-                                }
+                                 message: `Supprimer l'utilisateur "${u.name}" ?`,
+                                 onConfirm: () => {
+                                   const token = localStorage.getItem("senaura_auth_token");
+                                   const headers: Record<string, string> = {};
+                                   if (token) headers.Authorization = `Bearer ${token}`;
+                                   authFetch(`/api/admin/users/${u.id}`, { method: "DELETE", headers }).catch(()=>{});
+                                   setAdminUsers(adminUsers.filter(item => item.id !== u.id));
+                                 }
                               })
                             }}
                             className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300"
@@ -3594,11 +3670,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
 
                   <button
-                    onClick={() => {
-                      const name = prompt("Nom complet du technicien :");
+                    onClick={async () => {
+                      const name = await askPrompt("Nouveau Technicien", "Nom complet du technicien :");
                       if (!name) return;
-                      const cat = prompt("Spécialité (Solaire, Fibre, Caméras, Électricité) :", "Énergie Solaire");
-                      const rate = prompt("Tarif horaire (FCFA) :", "15000");
+                      const cat = await askPrompt("Nouveau Technicien", "Spécialité (Solaire, Fibre, Caméras, Électricité) :", "Énergie Solaire", "Énergie Solaire");
+                      const rate = await askPrompt("Nouveau Technicien", "Tarif horaire (FCFA) :", "15000", "15000");
 
                       const newPro = {
                         id: `pro-${Date.now()}`,
@@ -3711,11 +3787,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     <button
                       onClick={async () => {
-                        const name = prompt("Nom du matériel / équipement :");
+                        const name = await askPrompt("Nouveau Produit", "Nom du matériel / équipement :");
                         if (!name) return;
-                        const cat = prompt("Catégorie (Solaire, Caméras, Réseau, Ordinateurs) :", "Solaire & Énergie");
-                        const price = prompt("Prix unitaire (FCFA) :", "250000");
-                        const stockVal = prompt("Quantité en stock :", "15");
+                        const cat = await askPrompt("Nouveau Produit", "Catégorie (Solaire, Caméras, Réseau, Ordinateurs) :", "Solaire & Énergie", "Solaire & Énergie");
+                        const price = await askPrompt("Nouveau Produit", "Prix unitaire (FCFA) :", "250000", "250000");
+                        const stockVal = await askPrompt("Nouveau Produit", "Quantité en stock :", "15", "15");
 
                         const newProd = {
                           id: `prod-${Date.now()}`,
@@ -3730,7 +3806,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         };
 
                         try {
-                          await fetch("/api/db/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newProd) });
+                          await authFetch("/api/db/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newProd) });
                         } catch (e) {}
 
                         setAdminProducts([newProd, ...adminProducts]);
@@ -3761,12 +3837,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                         <div className="flex flex-col gap-1">
                           <button
-                            onClick={() => {
-                              const newStock = prompt(`Nouveau stock pour ${p.name} :`, p.stock.toString());
-                              if (newStock) {
-                                fetch(`/api/admin/products/${p.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ stock: parseInt(newStock, 10) }) }).catch(()=>{});
-                                setAdminProducts(adminProducts.map(item => item.id === p.id ? { ...item, stock: parseInt(newStock, 10) } : item));
-                              }
+                            onClick={async () => {
+                              const newStock = await askPrompt("Mise à jour du Stock", `Nouveau stock pour ${p.name} :`, p.stock.toString(), p.stock.toString());
+                               if (newStock) {
+                                 authFetch(`/api/db/products/${p.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ stock: parseInt(newStock, 10) }) }).catch(()=>{});
+                                 setAdminProducts(adminProducts.map(item => item.id === p.id ? { ...item, stock: parseInt(newStock, 10) } : item));
+                               }
                             }}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold"
                           >
@@ -3775,11 +3851,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <button
                             onClick={() => {
                               setConfirmConfig({
-                                message: `Supprimer le produit ${p.name} ?`,
-                                onConfirm: () => {
-                                  fetch(`/api/admin/products/${p.id}`, { method: "DELETE" }).catch(()=>{});
-                                  setAdminProducts(adminProducts.filter(item => item.id !== p.id));
-                                }
+                                 message: `Supprimer le produit ${p.name} ?`,
+                                 onConfirm: async () => {
+                                   try {
+                                     const token = localStorage.getItem("senaura_auth_token");
+                                     const headers: Record<string, string> = {};
+                                     if (token) headers.Authorization = `Bearer ${token}`;
+                                     await authFetch(`/api/db/products/${p.id}`, { method: "DELETE", headers });
+                                   } catch {}
+                                   setAdminProducts(adminProducts.filter(item => item.id !== p.id));
+                                 }
                               })
                             }}
                             className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300"
@@ -3851,11 +3932,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 <button
                   onClick={async () => {
-                    const title = prompt("Titre de la formation SuperAdmin :");
+                    const title = await askPrompt("Nouvelle Formation", "Titre de la formation SuperAdmin :");
                     if (!title) return;
-                    const cat = prompt("Catégorie (IA, Solaire, Réseau, Sécurité, Domotique) :", "IA & Data");
-                    const price = prompt("Prix public (FCFA) :", "50000");
-                    const duration = prompt("Durée totale :", "20 Heures");
+                    const cat = await askPrompt("Nouvelle Formation", "Catégorie (IA, Solaire, Réseau, Sécurité, Domotique) :", "IA & Data", "IA & Data");
+                    const price = await askPrompt("Nouvelle Formation", "Prix public (FCFA) :", "50000", "50000");
+                    const duration = await askPrompt("Nouvelle Formation", "Durée totale :", "20 Heures", "20 Heures");
 
                     const newC = {
                       id: `fc-admin-${Date.now()}`,
@@ -3871,7 +3952,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     };
 
                     try {
-                      await fetch("/api/db/courses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newC) });
+                      await authFetch("/api/db/courses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newC) });
                     } catch (e) {}
 
                     setFormateurCourses([newC, ...formateurCourses]);
@@ -3944,25 +4025,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span className="text-xs font-mono font-bold text-amber-400">{formatCurrency(c.price, currency)}</span>
 
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              fetch(`/api/trainer/courses/${c.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ status: c.status === "Publié" ? "Brouillon" : "Publié" }) }).catch(()=>{});
-                              fetch(`/api/admin/courses/${c.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ status: c.status === "Publié" ? "Brouillon" : "Publié" }) }).catch(()=>{});
-                              setFormateurCourses(formateurCourses.map(item => item.id === c.id ? { ...item, status: item.status === "Publié" ? "Brouillon" : "Publié" } : item));
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold"
-                          >
-                            {c.status === "Publié" ? "Masquer" : "Publier"}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setConfirmConfig({
-                                message: `Supprimer la formation ${c.title} ?`,
-                                onConfirm: () => {
-                                  fetch(`/api/trainer/courses/${c.id}`, { method: "DELETE" }).catch(()=>{});
-                                  fetch(`/api/admin/courses/${c.id}`, { method: "DELETE" }).catch(()=>{});
-                                  setFormateurCourses(formateurCourses.filter(item => item.id !== c.id));
-                                }
+                           <button
+                             onClick={() => {
+                               authFetch(`/api/db/courses/${c.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ status: c.status === "Publié" ? "Brouillon" : "Publié" }) }).catch(()=>{});
+                               setFormateurCourses(formateurCourses.map(item => item.id === c.id ? { ...item, status: item.status === "Publié" ? "Brouillon" : "Publié" } : item));
+                             }}
+                             className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold"
+                           >
+                             {c.status === "Publié" ? "Masquer" : "Publier"}
+                           </button>
+                           <button
+                             onClick={() => {
+                               setConfirmConfig({
+                                 message: `Supprimer la formation ${c.title} ?`,
+                                 onConfirm: () => {
+                                   authFetch(`/api/db/courses/${c.id}`, { method: "DELETE" }).catch(()=>{});
+                                   setFormateurCourses(formateurCourses.filter(item => item.id !== c.id));
+                                 }
                               })
                             }}
                             className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300"
@@ -4198,9 +4277,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
 
                 <button
-                  onClick={() => {
-                    const msg = prompt("Message d'alerte générale aux utilisateurs :");
-                    if (msg) setConfirmConfig({ isAlert: true, message: "Alerte d'information diffusée avec succès !", onConfirm: () => {} })
+                  onClick={async () => {
+                    const msg = await askPrompt("Alerte Générale", "Message d'alerte générale aux utilisateurs :");
+                    if (msg) setConfirmConfig({ isAlert: true, type: "info", message: "Alerte d'information diffusée avec succès !", onConfirm: () => {} })
                   }}
                   className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-lg shadow-sky-500/20"
                 >
@@ -4212,8 +4291,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
                   <span className="text-xs text-slate-400 font-bold">Tickets Ouverts</span>
-                  <p className="text-2xl font-black text-amber-400 font-mono">3 En Attente</p>
-                  <p className="text-[10px] text-slate-500">Temps de réponse moyen: 12 min</p>
+                  <p className="text-2xl font-black text-amber-400 font-mono">0 En Attente</p>
+                  <p className="text-[10px] text-slate-500">Temps de réponse moyen: -- min</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
                   <span className="text-xs text-slate-400 font-bold">Hotline WhatsApp</span>
@@ -4222,7 +4301,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
                   <span className="text-xs text-slate-400 font-bold">Tickets Résolus</span>
-                  <p className="text-2xl font-black text-indigo-400 font-mono">148 Clôturés</p>
+                  <p className="text-2xl font-black text-indigo-400 font-mono">0 Clôturés</p>
                   <p className="text-[10px] text-slate-500">Ce mois-ci</p>
                 </div>
               </div>
@@ -4234,33 +4313,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span>Derniers Tickets de Support</span>
                 </h4>
 
-                <div className="space-y-2">
-                  {[
-                    { id: "TCK-101", user: "Mamadou Fall", subject: "Question sur l'installation du Kit Solaire 5kVA", status: "Nouveau", date: "Il y a 20 min" },
-                    { id: "TCK-102", user: "Mariama Ba", subject: "Demande de facture proforma pour projet BTP", status: "En Cours", date: "Il y a 2 heures" },
-                    { id: "TCK-103", user: "Ibrahima Diallo", subject: "Confirmation de rendez-vous pour audit réseau", status: "Résolu", date: "Hier 16:30" },
-                  ].map((t) => (
-                    <div key={t.id} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-sky-400">{t.id}</span>
-                          <span className="text-xs font-bold text-white">{t.user}</span>
-                          <span className="text-[10px] text-slate-500">({t.date})</span>
-                        </div>
-                        <p className="text-xs text-slate-300 mt-1">{t.subject}</p>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          const reply = prompt(`Répondre au ticket ${t.id} pour ${t.user} :`);
-                          if (reply) setConfirmConfig({ isAlert: true, message: "Réponse transmise au client par SMS & Email !", onConfirm: () => {} })
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs shrink-0"
-                      >
-                        Répondre
-                      </button>
-                    </div>
-                  ))}
+                <div className="flex flex-col items-center justify-center py-16 text-center space-y-4 rounded-2xl border border-slate-800/50 bg-slate-950/50">
+                  <div className="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mx-auto">
+                    <Headphones className="w-8 h-8 text-sky-500/50" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-base">Aucun ticket de support</p>
+                    <p className="text-slate-400 text-sm mt-1">
+                      Votre centre d'assistance est à jour. Les demandes clients apparaîtront ici.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4269,6 +4331,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* TAB 10: CONFIGURATION SI & TARIFS */}
           {adminTab === "settings" && (
             <SuperAdminSettingsManager />
+          )}
+
+          {/* TAB 11: SÉCURITÉ & PARE-FEU */}
+          {adminTab === "security" && (
+            <SecurityFirewallPanel />
           )}
 
           </div> {/* Closing ADMIN main content flex-1 */}
@@ -4299,6 +4366,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
 
       <ActionConfirmModal config={confirmConfig} onClose={() => setConfirmConfig(null)} />
+      <CustomDialog
+        isOpen={!!promptConfig}
+        type="prompt"
+        title={promptConfig?.title || ""}
+        message={promptConfig?.message || ""}
+        placeholder={promptConfig?.placeholder}
+        defaultValue={promptConfig?.defaultValue}
+        confirmLabel="Valider"
+        cancelLabel="Annuler"
+        onConfirm={(val) => { promptConfig?.resolve(val); setPromptConfig(null); }}
+        onCancel={() => { promptConfig?.resolve(undefined); setPromptConfig(null); }}
+      />
 
       {/* MODAL CERTIFICAT APPRENANT PREVIEW */}
       <OfficialCertificateModal

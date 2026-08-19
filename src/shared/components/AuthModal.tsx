@@ -135,11 +135,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
         if (!uniqueness.available) {
           if (uniqueness.isPhoneTaken) {
-            setFieldErrors((prev) => ({
-              ...prev,
-              phone: "Ce numéro est déjà enregistré.",
-            }));
-            setError("Ce numéro de téléphone est déjà associé à un compte. Veuillez basculer sur 'Se Connecter' pour entrer votre Code PIN.");
+            // Tentative de connexion transparente si le numéro existe déjà
+            const authRes = await SecurityPinService.authenticate(cleanPhone, pin);
+            if (!authRes.success) {
+              setFieldErrors((prev) => ({
+                ...prev,
+                pin: "Code PIN incorrect.",
+              }));
+              setError("Ce numéro est déjà inscrit. Le Code PIN saisi est incorrect (mot de passe invalide).");
+              setIsSubmitting(false);
+              return;
+            }
+
+            // Si le PIN est bon, on le connecte directement (Seamless Login)
+            const account = authRes.account!;
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 },
+              colors: ["#25D366", "#008751", "#FFCC00", "#38BDF8"],
+            });
+
+            store.loginWithPhone(
+              phone,
+              account.fullName || fullName.trim() || `Utilisateur ${cleanPhone}`,
+              account.role || selectedRole,
+              account.region || region,
+              pin,
+              account.proStatus,
+              account.trialExpiresAt,
+              account.proApproved
+            );
+
+            setIsSubmitting(false);
+            if (onSuccess) onSuccess();
+            onClose();
+            return;
           } else if (uniqueness.isEmailTaken) {
             setFieldErrors((prev) => ({
               ...prev,

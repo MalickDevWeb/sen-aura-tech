@@ -323,7 +323,7 @@ export interface SystemConfig {
 // DEFAULT FACTORY CONFIGURATION
 // ----------------------------------------------------------------------------
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
-  version: "3.0.0",
+  version: "3.1.0",
   lastUpdated: new Date().toISOString(),
   updatedBy: "Super Admin (senauratech@gmail.com)",
   branding: {
@@ -614,120 +614,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       eyebrow: "INITIATIVE FLAGSHIP NATIONALE • SEN AURA TECH",
       title: "Programme « 1 SEMAINE = 1 APPLICATION = 1 SOLUTION »",
       subtitle: "Chaque semaine, l'équipe d'ingénieurs et les talents certifiés de SEN AURA TECH & ACADEMY conçoivent, développent et déploient une solution 100% opérationnelle.",
-      items: [
-        {
-          id: "prog-1",
-          weekNumber: 1,
-          title: "SEN-PHARMA : Urgences & Pharmacies de Garde",
-          codename: "Pharmacies & Médicaments Dakar",
-          category: "Santé & Citoyen",
-          problemStatement: "Difficulté pour les citoyens sénégalais de trouver rapidement une pharmacie de garde ouverte la nuit et de vérifier la disponibilité d'un médicament rare.",
-          solutionDelivered: "Application web/PWA géolocalisée avec recherche instantanée par quartier, calcul d'itinéraire direct et consultation en temps réel des gardes nocturnes.",
-          technologies: ["Next.js", "Leaflet Maps", "PostgreSQL", "PWA Offline"],
-          durationDays: 7,
-          status: "LIVRÉ & OPÉRATIONNEL",
-          impactMetric: "+14 500 recherches / mois",
-          demoUrl: "https://senauratech.sn/solutions/sen-pharma",
-          image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&auto=format&fit=crop&q=80",
-          githubOpenSource: true,
-          active: true,
-          isPublished: true,
-          featured: true,
-        },
-        {
-          id: "prog-2",
-          weekNumber: 2,
-          title: "SEN-QUICK PAY : Micro-Boutique WhatsApp & Wave",
-          codename: "Social Commerce Express",
-          category: "E-Commerce & FinTech",
-          problemStatement: "Les marchands et créateurs locaux perdent des ventes sur WhatsApp car les clients hésitent à commander sans catalogue clair ni paiement automatisé.",
-          solutionDelivered: "Générateur de mini-boutique 1-clic avec panier intelligent, paiement automatique par QR Code Wave et envoi instantané du reçu PDF via WhatsApp.",
-          technologies: ["React", "API Wave Sénégal", "PDF Auto-Gen", "WhatsApp Webhook"],
-          durationDays: 7,
-          status: "LIVRÉ & OPÉRATIONNEL",
-          impactMetric: "3,2x de conversions pour 80+ vendeurs",
-          demoUrl: "https://senauratech.sn/solutions/sen-quickpay",
-          image: "https://images.unsplash.com/photo-1556742049-0a67e5572293?w=800&auto=format&fit=crop&q=80",
-          githubOpenSource: true,
-          active: true,
-          isPublished: true,
-          featured: false,
-        },
-        {
-          id: "prog-3",
-          weekNumber: 3,
-          title: "SEN-ARTISAN PRO : Dépannage & Artisans Certifiés",
-          codename: "Uber des Artisans de Dakar",
-          category: "Artisanat & Services",
-          problemStatement: "Manque de confiance et délais interminables pour trouver un plombier, électricien ou frigoriste qualifié en cas de panne urgente à domicile.",
-          solutionDelivered: "Système de dispatching d'artisans avec vérification d'identité, tarification transparente pré-estimée et système d'avis vérifiés.",
-          technologies: ["Flutter", "Firebase Auth", "Geolocation Engine", "Orange Money"],
-          durationDays: 7,
-          status: "LIVRÉ & OPÉRATIONNEL",
-          impactMetric: "Moins de 35 min de délai d'intervention",
-          demoUrl: "https://senauratech.sn/solutions/sen-artisan",
-          image: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&auto=format&fit=crop&q=80",
-          githubOpenSource: false,
-          active: true,
-          isPublished: true,
-          featured: false,
-        },
-        {
-          id: "prog-4",
-          weekNumber: 4,
-          title: "SEN-AURA AI CO-PILOT : Assistant Juridique & Fiscal OHADA",
-          codename: "IA Expert Droit Sénégalais",
-          category: "IA & Automatisation",
-          problemStatement: "Complexité pour les PME et startups locales de rédiger des contrats conformes au droit OHADA et d'anticiper leurs obligations fiscales et sociales.",
-          solutionDelivered: "Agent conversationnel spécialisé entraîné sur le Code du travail sénégalais et le droit OHADA, capable de rédiger et auditer des contrats en 30 secondes.",
-          technologies: ["Gemini 2.5 Flash", "RAG Embeddings", "FastAPI", "Tailwind CSS"],
-          durationDays: 7,
-          status: "LIVRÉ & OPÉRATIONNEL",
-          impactMetric: "94% de gain de temps sur la conformité",
-          demoUrl: "https://senauratech.sn/solutions/sen-copilot-ia",
-          image: "https://images.unsplash.com/photo-1677442136019-21780efad99a?w=800&auto=format&fit=crop&q=80",
-          githubOpenSource: true,
-          active: true,
-          isPublished: true,
-          featured: true,
-        },
-        {
-          id: "prog-5",
-          weekNumber: 5,
-          title: "SEN-AGRI CLIMAT : Météo Prédictive & Prix des Marchés",
-          codename: "AgriTech & Coopératives",
-          category: "AgriTech & Logistique",
-          problemStatement: "Les producteurs agricoles vendent à perte faute d'informations fiables sur les cours des marchés régionaux (Niayes, Touba, Tambacounda) et la météo.",
-          solutionDelivered: "Tableau de bord vocal (Français & Wolof) diffusant les cours du jour des denrées (oignons, arachides, mangues) et alertes d'irrigation.",
-          technologies: ["Voice AI", "Satellite Weather API", "SMS Gateway", "Node.js"],
-          durationDays: 7,
-          status: "EN COURS DE SPRINT",
-          impactMetric: "Phase de test avec 12 coopératives",
-          image: "https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=800&auto=format&fit=crop&q=80",
-          githubOpenSource: false,
-          active: true,
-          isPublished: true,
-          featured: false,
-        },
-        {
-          id: "prog-6",
-          weekNumber: 6,
-          title: "SEN-CAMPUS CODE : Plateforme d'Entraînement Algorithmique",
-          codename: "Learn to Code Sénégal",
-          category: "Éducation & EdTech",
-          problemStatement: "Les étudiants en informatique ont besoin d'exercices pratiques interactifs contextualisés pour réussir les tests techniques des grandes entreprises.",
-          solutionDelivered: "Bac à sable de code interactif dans le navigateur avec correction automatique par l'IA et simulateur d'entretiens techniques FAANG / UEMOA.",
-          technologies: ["WebAssembly", "TypeScript", "Monaco Editor", "Docker Sandbox"],
-          durationDays: 7,
-          status: "PROCHAIN SPRINT",
-          impactMetric: "Lancement Semaine Prochaine",
-          image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop&q=80",
-          githubOpenSource: true,
-          active: true,
-          isPublished: true,
-          featured: false,
-        },
-      ],
+      items: [],
     },
     community: {
       enabled: true,
@@ -758,15 +645,17 @@ export function loadSystemConfig(): SystemConfig {
     if (!saved) return DEFAULT_SYSTEM_CONFIG;
     const parsed = JSON.parse(saved);
 
-    // === VERSION GUARD: force-clear mock showcase items on upgrade to v3.0.0 ===
+    // === VERSION GUARD: force-clear all mock showcase items on upgrade to v3.1.0 ===
     const savedVersion = parsed?.version || "0.0.0";
-    const isPreV3 = savedVersion < "3.0.0";
-    if (isPreV3) {
+    const isPreV31 = savedVersion < "3.1.0";
+    if (isPreV31) {
       // Wipe cached mock items — they are now managed exclusively via Admin Dashboard
       if (parsed.homeShowcase?.marketplacePros) parsed.homeShowcase.marketplacePros.items = [];
       if (parsed.homeShowcase?.boutique) parsed.homeShowcase.boutique.items = [];
       if (parsed.homeShowcase?.academy) parsed.homeShowcase.academy.items = [];
-      parsed.version = "3.0.0";
+      // Also purge the hardcoded weekly solution programs
+      if (parsed.homeShowcase?.weeklySolutions) parsed.homeShowcase.weeklySolutions.items = [];
+      parsed.version = "3.1.0";
       // Persist the cleaned config back to localStorage
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     }

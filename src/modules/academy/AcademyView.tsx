@@ -54,6 +54,7 @@ import { generateCoursePaymentWhatsAppMsg, redirectToWhatsAppPayment, getWhatsAp
 import { useSWRInstant } from "../../lib/swr-cache";
 import { CourseDTO } from "../../shared/contracts/types";
 import { MessageCircle } from "lucide-react";
+import { authFetch } from "../../lib/authFetch";
 
 interface AcademyViewProps {
   currency: "FCFA" | "EUR";
@@ -116,7 +117,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({ currency }) => {
     "/api/db/courses",
     async () => {
       try {
-        const res = await fetch("/api/db/courses");
+        const res = await authFetch("/api/db/courses");
         const json = await res.json();
         return json.courses || [];
       } catch (e) {
@@ -152,7 +153,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({ currency }) => {
     
     // 1. Query API backend & Neon PostgreSQL
     try {
-      const res = await fetch(`/api/certificates/verify/${encodeURIComponent(searchKey)}`);
+      const res = await authFetch(`/api/certificates/verify/${encodeURIComponent(searchKey)}`);
       const data = await res.json();
       if (data && data.valid && data.certificate) {
         setVerifiedCertResult({

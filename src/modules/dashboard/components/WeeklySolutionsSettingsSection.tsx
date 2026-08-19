@@ -297,30 +297,54 @@ export const WeeklySolutionsSettingsSection: React.FC<WeeklySolutionsSettingsSec
   };
 
   // Image File Upload Handler
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size < 6MB
-    if (file.size > 6 * 1024 * 1024) {
-      alert("L'image est trop volumineuse. Veuillez choisir un fichier de moins de 6 Mo.");
+    // Check size < 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      openDialog({
+        type: "alert",
+        title: "Fichier trop volumineux",
+        message: "L'image est trop volumineuse (max 10 Mo). Veuillez choisir un fichier plus léger.",
+      });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === "string") {
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStage("Préparation...");
+
+    try {
+      const result = await uploadToCloudinary(file, "sen_aura_tech_weekly", "image", (percent, stage) => {
+        setUploadProgress(percent);
+        setUploadStage(stage);
+      });
+
+      if (result.success) {
         setForm((prev) => ({
           ...prev,
-          image: event.target?.result as string,
+          image: result.secure_url,
         }));
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error(err);
+      openDialog({
+        type: "alert",
+        title: "Erreur d'upload",
+        message: "Impossible d'importer l'image sur Cloudinary. Veuillez réessayer.",
+        danger: true,
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      e.target.value = ""; // Reset input
+    }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      {dialog}
       
       {/* SECTION HEADER & MASTER SWITCH */}
       <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
@@ -352,6 +376,7 @@ export const WeeklySolutionsSettingsSection: React.FC<WeeklySolutionsSettingsSec
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
+                aria-label="Activer ou masquer la section Programme"
                 checked={weeklyConfig.enabled !== false}
                 onChange={(e) =>
                   updateWeeklySolutions((prev) => ({
@@ -751,16 +776,31 @@ export const WeeklySolutionsSettingsSection: React.FC<WeeklySolutionsSettingsSec
                       accept="image/*"
                       onChange={handleFileUpload}
                       className="hidden"
+                      disabled={isUploading}
                     />
 
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                        disabled={isUploading}
+                        className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${
+                          isUploading
+                            ? "bg-slate-800 text-slate-400 pointer-events-none"
+                            : "bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950"
+                        }`}
                       >
-                        <Upload className="w-4 h-4" />
-                        <span>Importer une photo depuis l'ordinateur/téléphone</span>
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>{uploadProgress}% • {uploadStage}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            <span>Importer Image (max 10 Mo)</span>
+                          </>
+                        )}
                       </button>
                     </div>
 

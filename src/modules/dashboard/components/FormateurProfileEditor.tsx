@@ -22,6 +22,8 @@ import {
 import { store } from "../../../database/store";
 import { formatCurrency, BRAND_CONFIG } from "../../../config/constants";
 import { uploadToCloudinary } from "../../../lib/cloudinary";
+import { useDialog } from "../../../shared/components/CustomDialog";
+import { authFetch } from "../../../lib/authFetch";
 
 const ACADEMY_DOMAINS = [
   "Énergie Solaire & Photovoltaïque",
@@ -63,6 +65,7 @@ export const FormateurProfileEditor: React.FC<FormateurProfileEditorProps> = ({ 
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const { openDialog, dialog } = useDialog();
 
   const handleAddCert = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +90,12 @@ export const FormateurProfileEditor: React.FC<FormateurProfileEditorProps> = ({ 
         setAvatar(result.secure_url);
       }
     } catch {
-      alert("Erreur lors de l'upload de la photo de profil.");
+      openDialog({
+        type: "alert",
+        title: "Erreur d'upload",
+        message: "Erreur lors de l'upload de la photo de profil sur Cloudinary.",
+        danger: true,
+      });
     } finally {
       setIsUploading(false);
     }
@@ -119,7 +127,7 @@ export const FormateurProfileEditor: React.FC<FormateurProfileEditorProps> = ({ 
     };
 
     try {
-      await fetch("/api/formateur/profile", {
+      await authFetch("/api/formateur/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -136,6 +144,7 @@ export const FormateurProfileEditor: React.FC<FormateurProfileEditorProps> = ({ 
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      {dialog}
       {/* Header Info & Sync Status */}
       <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-2">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">

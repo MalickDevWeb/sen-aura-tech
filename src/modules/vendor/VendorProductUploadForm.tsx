@@ -38,6 +38,7 @@ import { uploadToCloudinary, CloudinaryUploadResult } from "../../lib/cloudinary
 import { CloudinaryDropzone } from "../../components/common/CloudinaryDropzone";
 import PublishingProcessModal from "../../components/common/PublishingProcessModal";
 import { formatCurrency } from "../../config/constants";
+import { authFetch } from "../../lib/authFetch";
 
 interface VendorProductUploadFormProps {
   onProductCreated: (product: any) => void;
@@ -410,7 +411,7 @@ export const VendorProductUploadForm: React.FC<VendorProductUploadFormProps> = (
     };
 
     try {
-      const response = await fetch("/api/vendor/products", {
+      const response = await authFetch("/api/vendor/products", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

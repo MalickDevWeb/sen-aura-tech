@@ -17,6 +17,7 @@ import {
 import { store } from "../../database/store";
 import { BRAND_CONFIG } from "../../config/constants";
 import { PoleType, QuoteRequestDTO } from "../contracts/types";
+import { authFetch } from "../../lib/authFetch";
 
 interface QuoteModalProps {
   isOpen: boolean;
@@ -191,7 +192,7 @@ export const QuoteModal: React.FC<QuoteModalProps> = ({
     };
 
     try {
-      const res = await fetch("/api/quotes/submit", {
+      const res = await authFetch("/api/quotes/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(quotePayload),
